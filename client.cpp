@@ -10,7 +10,7 @@ int main() {
     int clientSocket;
     struct sockaddr_in serverAddr;
     socklen_t addrSize;
-
+	int ativarBroadcast =1;
     // Create UDP socket
     clientSocket = socket(PF_INET, SOCK_DGRAM, 0);
     if (clientSocket < 0) {
@@ -18,7 +18,7 @@ int main() {
         return 1;
     }
 
-    if(setsockopt(clientSocket, SOL_SOCKET, SO_BROADCAST, &(int){1}, sizeof(int)) < 0) {
+    if(setsockopt(clientSocket, SOL_SOCKET, SO_BROADCAST, &ativarBroadcast, sizeof(int)) < 0) {
         std::cerr << "Error in setsockopt.\n";
         return 1;
     }
@@ -26,7 +26,7 @@ int main() {
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(53000); // Port number
-    serverAddr.sin_addr.s_addr = inet_addr("255.255.255.255"); // Server IP address
+    serverAddr.sin_addr.s_addr = INADDR_BROADCAST; // Server IP address
 
     std::string message = "Hello from UDP client";
     // Send data to server
