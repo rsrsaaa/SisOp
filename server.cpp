@@ -9,7 +9,7 @@ int main() {
     struct sockaddr_in serverAddr, clientAddr;
     socklen_t addrSize = sizeof(clientAddr);
     char buffer[1024];
-
+    int ativarBroadcast = 1;
     // Create UDP socket
     serverSocket = socket(PF_INET, SOCK_DGRAM, 0);
     if (serverSocket < 0) {
@@ -17,7 +17,7 @@ int main() {
         return 1;
     }
 
-    if(setsockopt(serverSocket, SOL_SOCKET, SO_BROADCAST, &(int){1}, sizeof(int)) < 0) {
+    if(setsockopt(serverSocket, SOL_SOCKET, SO_BROADCAST, &ativarBroadcast, sizeof(int)) < 0) {
         std::cerr << "Error in setsockopt.\n";
         return 1;
     }
