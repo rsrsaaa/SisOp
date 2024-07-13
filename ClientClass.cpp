@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
+#include <netinet/in.h>
 #define PORT 53000
 
 class Client {
@@ -19,7 +20,7 @@ public:
         sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
         serverAddress.sin_port = htons(PORT);
-        serverAddress.sin_addr.s_addr = inet_addr("255.255.255.255");
+        serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
 
         if (connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
             std::cerr << "Failed to connect to server." << std::endl;
@@ -27,7 +28,7 @@ public:
             return;
         }
 
-        char message[] = "Hello, server!";
+        char message[] = "sleep discovery service";
         if (send(clientSocket, message, strlen(message), 0) == -1) {
             std::cerr << "Failed to send message to server." << std::endl;
             close(clientSocket); 
