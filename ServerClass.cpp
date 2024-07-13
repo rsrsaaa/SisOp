@@ -22,7 +22,7 @@ public:
     int sockfd, n;
 	socklen_t clilen;
 	struct sockaddr_in serv_addr, cli_addr;
-	char buf[256];
+	char buff[256];
     managementTable table[3];
     void startServer() {
         // Create socket
@@ -64,18 +64,18 @@ public:
             }
 
             // Read data from client
-            bzero(buf, sizeof(buf));
-            n = read(newsockfd, buf, sizeof(buf));
+            bzero(buff, sizeof(buff));
+            n = read(newsockfd, buff, sizeof(buff));
             if (n < 0) {
                 perror("Error reading from socket");
                 exit(1);
             }
-            if(buf == "sleep discovery service")
+            if(buff == "sleep discovery service")
             {
                 
             }
             // Process data
-            printf("Received message: %s\n", buf);
+            printf("Received message: %s\n", buff);
             char message[] = "Hello, client!";
             if (send(newsockfd, message, strlen(message), 0) == -1) {
                 cerr << "Failed to send message to client." << endl;
