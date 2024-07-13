@@ -1,50 +1,35 @@
-// range de portas 50000 - 54999
-#include <iostream>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <string.h>
-#include <netinet/in.h>
-#define PORT 53000
+#include "ClientClass.h"
 
-class Client {
-public:
-    void run() {
-        // range de portas 50000 - 54999
-        int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-        if (clientSocket == -1) {
-            std::cerr << "Failed to create socket." << std::endl;
-            return;
-        }
-
-        sockaddr_in serverAddress;
-        serverAddress.sin_family = AF_INET;
-        serverAddress.sin_port = htons(PORT);
-        serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-        if (connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
-            std::cerr << "Failed to connect to server." << std::endl;
-            close(clientSocket);
-            return;
-        }
-
-        char message[] = "sleep discovery service";
-        if (send(clientSocket, message, strlen(message), 0) == -1) {
-            std::cerr << "Failed to send message to server." << std::endl;
-            close(clientSocket); 
-            return;
-        }
-
-        char buffer[1024];
-        memset(buffer, 0, sizeof(buffer));
-        if (recv(clientSocket, buffer, sizeof(buffer), 0) == -1) {
-            std::cerr << "Failed to receive message from server." << std::endl;
-            close(clientSocket);
-            return;
-        }
-
-        std::cout << "Received message from server: " << buffer << std::endl;
-
-        close(clientSocket);
+void Client::run() {
+    int clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (clientSocket == -1) {
+        std::cerr << "Failed to create socket." << std::endl;
+        return;
     }
-};
+
+    sockaddr_in serverAddress;
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(DISCOVERY_PORT_MIN);
+    serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1"); // Change this IP as per your server's IP
+
+    char message[] = "sleep discovery service";
+    if (sendto(clientSocket, message, strlen(message), 0, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1) {
+        std::cerr << "Failed to send message to server." << std::endl;
+        close(clientSocket);
+        return;
+    }
+
+    char buffer[BUFFER_SIZE];
+    memset(buffer, 0, sizeof(buffer));
+    sockaddr_in serverResponse;
+    socklen_t serverResponseSize = sizeof(serverResponse);
+    if (recvfrom(clientSocket, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&serverResponse, &serverResponseSize) == -1) {
+        std::cerr << "Failed to receive message from server." << std::endl;
+        close(clientSocket);
+        return;
+    }
+
+    std::cout << "Received message from server: " << buffer << std::endl;
+
+    close(clientSocket);
+}

@@ -1,19 +1,43 @@
 #include <iostream>
-#include "ServerClass.cpp"
-#include "ClientClass.cpp"
+#include <thread>
+#include "ServerClass.h"
+#include "ClientClass.h"
+#include "ManagementSubservice.h"
+#include "InterfaceSubservice.h"
+#include "DiscoverySubservice.h"
+#include "MonitoringSubservice.h"
+
 using namespace std;
 
 int main() {
-    int op;
+    int choice;
 
     cout << "Digite 1 para servidor e 2 para cliente" << endl;
-    cin >> op;
-    if (op == 1) {
-        Server server;
-        server.startServer();
+    cin >> choice;
+
+    if (choice == 1) {
+        ManagementSubservice managementService;
+        DiscoverySubservice discoveryService;
+        MonitoringSubservice monitoringService;
+
+        discoveryService.startDiscovery(true);
+        monitoringService.startMonitoring(true);
+
+        InterfaceSubservice interfaceService(managementService);
+        interfaceService.startInterface();
     } else {
         Client client;
         client.run();
+
+        // Exibir os participantes após a execução do cliente
+        DiscoverySubservice discoveryService;
+        vector<Participant> participants = discoveryService.getParticipants();
+        
+        cout << "Participants List:" << endl;
+        for (const auto& participant : participants) {
+            cout << "Name: " << participant.name << " IP: " << participant.ip
+                 << " Port: " << participant.port << " Status: " << (participant.asleep ? "Asleep" : "Awaken") << endl;
+        }
     }
 
     return 0;
