@@ -5,7 +5,6 @@ using namespace std;
 
 int main() {
     int op;
-
     cout << "Digite 1 para servidor e 2 para cliente" << endl;
     cin >> op;
     if (op == 1) {

@@ -16,7 +16,10 @@ struct managementTable
 {
     char name[20] = " ";
     char ip[20] = " ";
+    char mac[40] = " ";
+    char status[10] = " ";
     int port = 0;
+
 };
 void clearscreen()
 {
@@ -94,29 +97,72 @@ public:
                 cout<<"adicionando novo cliente"<<endl;
                 for (int i = 0; i < 3; i++)
                 {
+                    
                     if(strcmp(table[i].ip," ") == 0)
                     {
+                        // Get client MAC address
+                        strcpy(table[i].mac, reinterpret_cast<const char*>(cli_addr.sin_zero));
                         strcpy(table[i].name, inet_ntoa(cli_addr.sin_addr));
                         table[i].port = cli_addr.sin_port;
                         strcpy(table[i].ip, inet_ntoa(cli_addr.sin_addr));
+                        strcpy(table[i].status, "AWAKEN");
                         break;
                     }
                 }
-            }
-            // Process data
-            printf("Received message: %s\n", buff);
-            char message[] = "Hello, client!";
-            if (send(newsockfd, message, strlen(message), 0) == -1) {
-                cerr << "Failed to send message to client." << endl;
+                char message[] = "discovery ack";
+                if (send(newsockfd, message, strlen(message), 0) == -1) 
+                {
+                    cerr << "Failed to send message to client." << endl;
+                    close(newsockfd);
+                    return;
+                }
                 close(newsockfd);
-                return;
             }
-            close(newsockfd);
-            
             cout << "Tabela de gerenciamento de servicos" << endl;
             for (int i = 0; i < 3; i++)
             {
-                cout << "Cliente: " << table[i].name << " IP: " << table[i].ip << " Porta: " << table[i].port << endl;
+                cout << "MAC: " << table[i].mac << " IP: " << table[i].ip << " Porta: " << table[i].port << "Status: "<< table[i].status;
+                cout << endl;
+                // Send message to client
+                char message[] = "sleep status request";
+        
+                // Create a new socket for sending messages
+                int sendSocket = socket(AF_INET, SOCK_STREAM, 0);
+                if (sendSocket < 0) {
+                    perror("Error opening send socket");
+                    exit(1);
+                }
+
+                // Set up the client address
+                struct sockaddr_in clientAddr;
+                memset((char *) &clientAddr, 0, sizeof(clientAddr));
+                clientAddr.sin_family = AF_INET;
+
+                // Iterate through the management table and send a message to each client
+                
+                if (strcmp(table[i].ip, " ") != 0) 
+                {
+                    // Set the client IP and port
+                    clientAddr.sin_addr.s_addr = inet_addr(table[i].ip);
+                    clientAddr.sin_port = htons(table[i].port);
+
+                    // Connect to the client
+                    if (connect(sendSocket, (struct sockaddr *) &clientAddr, sizeof(clientAddr)) < 0) {
+                        perror("Error connecting to client");
+                        exit(1);
+                    }
+
+                    // Send the message to the client
+                    if (send(sendSocket, message, strlen(message), 0) == -1) {
+                        cerr << "Failed to send message to client." << endl;
+                        close(sendSocket);
+                        exit(1);
+                    }
+
+                    // Close the connection to the client
+                    close(sendSocket);
+                }
+                
             }
         }
 
