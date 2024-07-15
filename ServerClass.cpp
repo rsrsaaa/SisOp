@@ -1,5 +1,13 @@
 #include "global.hpp"
-// #include <arpa/inet.h>
+#include "netinet/ip_icmp.h"
+struct icmp_header
+{
+    unsigned char type;
+    unsigned char code;
+    unsigned short checksum;
+    unsigned short id;
+    unsigned short sequence;
+};
 class Server 
 {
 public:
@@ -7,12 +15,12 @@ public:
 	socklen_t clilen;
 	struct sockaddr_in serv_addr, cli_addr;
 	char buff[256];
-
+    
 
     int InitServerSocket()
     {
         // Create socket
-        int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
         if (sockfd < 0) {
             perror("Error opening socket");
             exit(1);
@@ -36,18 +44,13 @@ public:
     string ListenToClientDiscover(int sockfd)
     {
         cout<<"rodando"<<endl;
-        listen(sockfd, 5);
         clilen = sizeof(cli_addr);
-        // Accept incoming connections
-        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-        if (newsockfd < 0) {
-            perror("Error accepting connection");
-            exit(1);
-        }
+        unsigned int length;
         // Read data from client
         cout<<"esperando dados do cliente"<<endl;
         bzero(buff, sizeof(buff));
-        n = read(newsockfd, buff, sizeof(buff));
+        length = sizeof(struct sockaddr_in);
+        n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *) &cli_addr, &length);
         if (n < 0) {
             perror("Error reading from socket");
             exit(1);
@@ -73,40 +76,48 @@ public:
         }
         close(newsockfd);
     }
+
     void SendStatusRequest()
     {
         for (int i = 0; i < 3; i++)
         {
             if (table[i].ip != " ")
             {
-                char message[] = "sleep status request";
-                // Create a new socket for sending messages
-                int sendSocket = socket(AF_INET, SOCK_STREAM, 0);
-                if (sendSocket < 0) {
-                    perror("Error opening send socket");
-                    exit(1);
-                }
+                struct icmphdr icmp_pkt; 
+                struct sockaddr_in dest_addr;
+                struct sockaddr_in from;
+                
+                socklen_t fromlen = sizeof(from);
+                dest_addr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
+                int sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 
-                // Set up the client address
-                struct sockaddr_in clientAddr;
-                memset((char *) &clientAddr, 0, sizeof(clientAddr));
-                clientAddr.sin_family = AF_INET;
+                char buffer[1024];
 
-                // Set the client IP and port
-                clientAddr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
-                clientAddr.sin_port = htons(STATUS_PORT);
+                memset(&icmp_pkt, 0, sizeof(icmp_pkt));
+                icmp_pkt.type = ICMP_ECHO;
+                icmp_pkt.code = 0; 
+                icmp_pkt.un.echo.id = getpid();
+                icmp_pkt.un.echo.sequence = 0;
+                icmp_pkt.checksum = calculate_checksum(&icmp_pkt, sizeof(icmp_pkt));
 
-                // Connect to the client
-                if (connect(sendSocket, (struct sockaddr *) &clientAddr, sizeof(clientAddr)) < 0) {
-                    table[i].status = "SLEEPING";
+                memcpy(buffer, &icmp_pkt, sizeof(icmp_pkt));
+
+                n = sendto(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
+                struct timeval timeout;
+                timeout.tv_sec = 5;
+                timeout.tv_usec = 0;
+                setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+                n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*) &from, &fromlen); 
+                if (n < 0)
+                {
+                    table[i].status = "ASLEEP";
                 }
                 else
                 {
+                    cout<<"recebendo mensagem"<<endl;
                     table[i].status = "AWAKEN";
                 }
-
-                // Close the connection to the client
-                close(sendSocket);
+                close(sockfd);
             }
         }
     }
@@ -118,7 +129,7 @@ public:
         {
             if (table[i].ip != " ")
             {
-                cout << table[i].name << "\t" << table[i].ip << "\t" << table[i].mac << "\t" << table[i].status << "\t" << table[i].port << endl;
+                cout << table[i].name << "\t" << table[i].ip << "\t" << table[i].mac << "\t\t" << table[i].status << "\t\t" << table[i].port << endl;
             }
         }
     }
