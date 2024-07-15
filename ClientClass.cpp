@@ -4,58 +4,48 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <thread>
+#include <chrono>
 
 Client::Client()
 {
-    discoverSocket = 0;
-    statusSocket = 0;
-    serverIP = "127.0.0.1"; // Exemplo: inicializa com um endereço IP padrão
-    serverPort = 50000;     // Exemplo: inicializa com uma porta padrão
-    asleep = false;         // Exemplo: inicializa como falsa (estação desperta)
+    memset(&discoverClientAddr, 0, sizeof(discoverClientAddr));
+    discoverClientAddr.sin_family = AF_INET;
+    discoverClientAddr.sin_port = htons(DISCOVER_PORT);
+    discoverClientAddr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 }
 
-void Client::InitClientSocket()
+void Client::InitDiscoverSocket()
 {
-    // Inicializa o socket UDP para descoberta
-    if ((discoverSocket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+    discoverSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (discoverSocket < 0)
     {
-        std::cerr << "Failed to create discover client socket." << std::endl;
+        std::cerr << "Failed to create discover socket." << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    // Configura o endereço do servidor para descoberta
-    std::memset(&serverAddrDiscover, 0, sizeof(serverAddrDiscover));
-    serverAddrDiscover.sin_family = AF_INET;
-    serverAddrDiscover.sin_port = htons(DISCOVER_PORT);               // Porta de descoberta
-    serverAddrDiscover.sin_addr.s_addr = inet_addr(serverIP.c_str()); // Converte o endereço IP para o formato apropriado
-
-    // Inicializa o socket UDP para status
-    if ((statusSocket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+    int broadcastEnable = 1;
+    if (setsockopt(discoverSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0)
     {
-        std::cerr << "Failed to create status client socket." << std::endl;
+        std::cerr << "Failed to enable broadcast on discover socket." << std::endl;
+        close(discoverSocket); // Fechar o socket em caso de erro
         exit(EXIT_FAILURE);
     }
 
-    // Configura o endereço do servidor para status
-    std::memset(&serverAddrStatus, 0, sizeof(serverAddrStatus));
-    serverAddrStatus.sin_family = AF_INET;
-    serverAddrStatus.sin_port = htons(STATUS_PORT);                 // Porta de status
-    serverAddrStatus.sin_addr.s_addr = inet_addr(serverIP.c_str()); // Converte o endereço IP para o formato apropriado
-}
+    // Bind o socket a uma porta específica para garantir o envio correto
+    struct sockaddr_in clientAddr;
+    memset(&clientAddr, 0, sizeof(clientAddr));
+    clientAddr.sin_family = AF_INET;
+    clientAddr.sin_port = htons(0); // Bind a qualquer porta disponível
+    clientAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-void Client::SendDiscoveryMessage()
-{
-    const char *message = "sleep service discovery";
-    int messageLen = std::strlen(message);
-
-    if (sendto(discoverSocket, message, messageLen, 0,
-               (struct sockaddr *)&serverAddrDiscover, sizeof(serverAddrDiscover)) == -1)
+    if (bind(discoverSocket, (struct sockaddr *)&clientAddr, sizeof(clientAddr)) < 0)
     {
-        std::cerr << "Failed to send discovery message." << std::endl;
-    }
-    else
-    {
-        std::cout << "Discovery message sent to server." << std::endl;
+        std::cerr << "Failed to bind discover socket." << std::endl;
+        close(discoverSocket); // Fechar o socket em caso de erro
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -152,4 +142,17 @@ void Client::SendUDPMessage(const std::string &ip, int port, const std::string &
     serverAddr.sin_addr.s_addr = inet_addr(ip.c_str());
 
     // Código para enviar mensagem UDP
+}
+
+void Client::SendDiscoveryMessages()
+{
+    int broadcastPermission = 1;
+    if (setsockopt(discoverSocket, SOL_SOCKET, SO_BROADCAST, (void *)&broadcastPermission, sizeof(broadcastPermission)) < 0)
+        perror("setsockopt() failed");
+
+    while (true)
+    {
+        sendto(discoverSocket, DISCOVERY_MESSAGE, strlen(DISCOVERY_MESSAGE), 0, (struct sockaddr *)&discoverClientAddr, sizeof(discoverClientAddr));
+        std::this_thread::sleep_for(std::chrono::seconds(DISCOVER_INTERVAL_SECONDS));
+    }
 }
