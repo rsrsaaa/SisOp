@@ -4,8 +4,8 @@
 #include <string>
 #include <netinet/in.h>
 
-#define DISCOVER_PORT 53000
-#define STATUS_PORT 52000
+#define DISCOVER_PORT 50000 // Alterado para uma porta dentro do range (exemplo)
+#define STATUS_PORT 50001   // Alterado para uma porta dentro do range (exemplo)
 
 struct managementTable
 {

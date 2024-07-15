@@ -4,9 +4,8 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include "global.hpp"
 
-#define DISCOVER_PORT 53000 // Defina a porta de descoberta UDP aqui
-#define STATUS_PORT 52000   // Defina a porta de status UDP aqui
 
 struct ClientInfo
 {

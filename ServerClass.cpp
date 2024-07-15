@@ -41,24 +41,6 @@ int Server::InitDiscoverSocket()
     return 0;
 }
 
-// Exemplo de refatoração na função de tratamento de mensagens de descoberta
-void Server::ListenToClientDiscover()
-{
-    struct sockaddr_in clientAddr;
-    socklen_t clientAddrLen = sizeof(clientAddr);
-    char buffer[1024] = {0};
-
-    ssize_t numBytes = recvfrom(discoverSocket, buffer, sizeof(buffer), 0, (struct sockaddr *)&clientAddr, &clientAddrLen);
-    if (numBytes == -1)
-    {
-        std::cerr << "Error receiving discover data from client." << std::endl;
-        return;
-    }
-
-    std::cout << "Received discovery message from client: " << buffer << std::endl;
-    ProcessDiscoveryMessage(buffer);
-}
-
 // Exemplo de função para processar mensagens de descoberta
 void Server::ProcessDiscoveryMessage(const std::string &message)
 {
