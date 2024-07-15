@@ -1,11 +1,22 @@
 #include "ServerClass.h"
+#include "global.hpp"
 #include <iostream>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <cstring>
-#include "global.hpp"
 #include <algorithm>
 #include <string>
+#include <chrono>
+#include <thread>
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+// Variáveis globais e definições de mutex
+std::vector<ClientInfo> clientTable;
+std::mutex tableMutex;
+std::unordered_map<std::string, int> clientsTable;
+std::mutex clientTableMutex;
+extern bool isRunning; // Declaração externa da variável global isRunning
 
 Server::Server()
 {
@@ -66,35 +77,6 @@ int Server::InitServerSocket()
     return 0;
 }
 
-// Exemplo de melhoria na função de inicialização do socket de descoberta
-int Server::InitDiscoverSocket()
-{
-    discoverSocket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (discoverSocket == -1)
-    {
-        perror("Failed to create discover server socket");
-        return -1;
-    }
-
-    struct sockaddr_in discoverAddr;
-    std::memset(&discoverAddr, 0, sizeof(discoverAddr));
-    discoverAddr.sin_family = AF_INET;
-    discoverAddr.sin_addr.s_addr = INADDR_ANY;
-    discoverAddr.sin_port = htons(DISCOVER_PORT);
-
-    if (bind(discoverSocket, (struct sockaddr *)&discoverAddr, sizeof(discoverAddr)) == -1)
-    {
-        perror("Failed to bind discover server socket");
-        close(discoverSocket);
-        return -1;
-    }
-
-    std::cout << "Discover server socket initialized and listening on port " << DISCOVER_PORT << std::endl;
-
-    return 0;
-}
-
-// Exemplo de função para processar mensagens de descoberta
 void Server::ProcessDiscoveryMessage(const std::string &message)
 {
     std::string messageCopy = message; // Faz uma cópia da mensagem original
@@ -112,226 +94,140 @@ void Server::ProcessDiscoveryMessage(const std::string &message)
     }
     tokens.push_back(messageCopy); // Último token após o último delimitador
 
-    if (tokens.size() == 4)
-    {
-        std::string hostname = tokens[0];
-        std::string ip = tokens[1];
-        std::string mac = tokens[2];
-        std::string status = tokens[3];
+    // Processa os tokens conforme necessário
+    std::string clientIP = tokens[0];
+    int clientPort = std::stoi(tokens[1]);
+    std::string clientHostname = tokens[2];
 
-        UpdateClientTable(hostname, ip, mac, status);
+    // Adiciona informações do cliente à tabela de clientes
+    AddClientToTable(clientIP, clientPort, clientHostname);
+}
+
+void Server::AddClientToTable(const std::string &clientIP, int clientPort, const std::string &clientHostname)
+{
+    // Protege o acesso à tabela de clientes com um mutex
+    std::lock_guard<std::mutex> guard(clientTableMutex);
+
+    // Verifica se o cliente já está na tabela
+    if (clientsTable.find(clientHostname) == clientsTable.end())
+    {
+        clientsTable[clientHostname] = clientPort;
+        std::cout << "Added client " << clientHostname << " with IP " << clientIP << " and port " << clientPort << " to the client table." << std::endl;
     }
     else
     {
-        std::cerr << "Invalid discovery message format." << std::endl;
-    }
-
-    PrintTable(); // Exibe a tabela atualizada
-}
-
-// Exemplo de função para atualizar a tabela de clientes
-void Server::UpdateClientTable(const std::string &hostname, const std::string &ip, const std::string &mac, const std::string &status)
-{
-    std::lock_guard<std::mutex> guard(tableMutex);
-
-    auto it = std::find_if(clientTable.begin(), clientTable.end(), [&](const ClientInfo &client)
-                           { return client.hostname == hostname; });
-
-    if (it != clientTable.end())
-    {
-        it->status = status;
-    }
-    else
-    {
-        ClientInfo newClient;
-        newClient.hostname = hostname;
-        newClient.ipAddress = ip;
-        newClient.macAddress = mac;
-        newClient.status = status;
-        clientTable.push_back(newClient);
+        std::cout << "Client " << clientHostname << " with IP " << clientIP << " and port " << clientPort << " is already in the client table." << std::endl;
     }
 }
 
-void Server::SendStatusRequest()
+void Server::ListenForDiscoveryMessages()
 {
-    // Preparação da mensagem de solicitação de status
-    std::string requestMessage = "status_request";
+    char buffer[1024] = {0};
+    struct sockaddr_in clientAddr;
+    socklen_t clientAddrLen = sizeof(clientAddr);
+    ssize_t numBytes;
 
-    // Tamanho do buffer para a mensagem
-    const int bufferSize = 1024;
-    char buffer[bufferSize];
-
-    // Mutex para garantir operação segura na tabela de clientes
-    std::lock_guard<std::mutex> guard(tableMutex);
-
-    // Itera sobre a tabela de clientes e envia solicitação de status para cada um
-    for (const auto &client : clientTable)
+    while (isRunning)
     {
-        // Configuração do endereço do cliente
-        struct sockaddr_in clientAddr;
-        memset(&clientAddr, 0, sizeof(clientAddr));
-        clientAddr.sin_family = AF_INET;
-        clientAddr.sin_port = htons(DISCOVER_PORT); // Porta de descoberta
-        inet_pton(AF_INET, client.ipAddress.c_str(), &clientAddr.sin_addr);
-
-        // Criação do socket UDP para envio
-        int discoverSocket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (discoverSocket == -1)
+        numBytes = recvfrom(discoverSocket, buffer, sizeof(buffer), 0, (struct sockaddr *)&clientAddr, &clientAddrLen);
+        if (numBytes == -1)
         {
-            std::cerr << "Failed to create discover socket." << std::endl;
-            continue; // Tenta enviar para o próximo cliente
-        }
-
-        // Envio da solicitação de status
-        ssize_t numBytesSent = sendto(discoverSocket, requestMessage.c_str(), requestMessage.length(), 0,
-                                      (struct sockaddr *)&clientAddr, sizeof(clientAddr));
-        if (numBytesSent == -1)
-        {
-            std::cerr << "Failed to send status request to client " << client.hostname << std::endl;
+            std::cerr << "Error receiving discovery message from client." << std::endl;
         }
         else
         {
-            std::cout << "Sent status request to client " << client.hostname << std::endl;
+            std::cout << "Received discovery message from client: " << buffer << std::endl;
+            // Processa a mensagem de descoberta recebida
+            ProcessDiscoveryMessage(buffer);
         }
+    }
 
-        // Fecha o socket após o envio
-        close(discoverSocket);
+    close(discoverSocket); // Fecha o socket de descoberta após a conclusão da execução
+}
+
+void Server::SendStatusUpdate(const std::string &clientIP, int clientPort, const std::string &statusMessage)
+{
+    struct sockaddr_in clientAddr;
+    std::memset(&clientAddr, 0, sizeof(clientAddr));
+
+    clientAddr.sin_family = AF_INET;
+    clientAddr.sin_port = htons(clientPort);
+    clientAddr.sin_addr.s_addr = inet_addr(clientIP.c_str());
+
+    ssize_t numBytes = sendto(statusSocket, statusMessage.c_str(), statusMessage.length(), 0, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+    if (numBytes == -1)
+    {
+        std::cerr << "Failed to send status update to client " << clientIP << ":" << clientPort << std::endl;
+    }
+    else
+    {
+        std::cout << "Sent status update to client " << clientIP << ":" << clientPort << std::endl;
     }
 }
 
-void Server::PrintTable()
+void Server::SendShutdownCommand(const std::string &clientHostname)
 {
-    std::lock_guard<std::mutex> guard(tableMutex); // Garante exclusão mútua ao acessar a tabela
+    // Implemente aqui a lógica para enviar um comando de desligamento para um cliente específico
+    // Exemplo fictício:
+    int clientPort = GetClientPort(clientHostname);
+    std::string shutdownCommand = "SHUTDOWN";
 
-    // Verifica se há clientes na tabela
-    if (clientTable.empty())
+    SendStatusUpdate("127.0.0.1", clientPort, shutdownCommand);
+}
+
+int Server::GetClientPort(const std::string &clientHostname)
+{
+    // Protege o acesso à tabela de clientes com um mutex
+    std::lock_guard<std::mutex> guard(clientTableMutex);
+
+    // Verifica se o cliente está na tabela de clientes
+    if (clientsTable.find(clientHostname) != clientsTable.end())
     {
-        std::cout << "Client table is empty." << std::endl;
+        return clientsTable[clientHostname];
+    }
+    else
+    {
+        std::cerr << "Client " << clientHostname << " not found in the client table." << std::endl;
+        return -1;
+    }
+}
+
+void Server::Start()
+{
+    // Inicializa o socket do servidor
+    if (InitServerSocket() == -1)
+    {
+        std::cerr << "Failed to initialize server socket. Exiting..." << std::endl;
         return;
     }
 
-    // Imprime cabeçalho da tabela
-    std::cout << "================ Client Table ================" << std::endl;
-    std::cout << "Hostname\tIP Address\tMAC Address\tStatus" << std::endl;
+    isRunning = true;
 
-    // Itera sobre a tabela de clientes e imprime cada cliente
-    for (const auto &client : clientTable)
-    {
-        std::cout << client.hostname << "\t"
-                  << client.ipAddress << "\t"
-                  << client.macAddress << "\t"
-                  << client.status << std::endl;
-    }
+    // Cria uma thread separada para ouvir mensagens de descoberta
+    std::thread discoveryThread(&Server::ListenForDiscoveryMessages, this);
 
-    // Imprime rodapé da tabela
-    std::cout << "==============================================" << std::endl;
+    // Aguarda a thread de descoberta terminar
+    discoveryThread.join();
+
+    // Limpeza: fechar sockets e liberar recursos, se necessário
+    close(discoverSocket);
+    close(statusSocket);
 }
 
-void Server::UpdateClientStatus(const std::string &hostname, const std::string &status)
-{
-    std::lock_guard<std::mutex> guard(tableMutex); // Garante exclusão mútua ao acessar a tabela
-
-    // Procura o cliente na tabela pelo hostname
-    auto it = std::find_if(clientTable.begin(), clientTable.end(), [&](const ClientInfo &client)
-                           { return client.hostname == hostname; });
-
-    if (it != clientTable.end())
-    {
-        // Atualiza o status do cliente encontrado
-        it->status = status;
-        std::cout << "Updated status of client " << hostname << " to " << status << std::endl;
-    }
-    else
-    {
-        // Cliente não encontrado na tabela
-        std::cerr << "Client " << hostname << " not found in client table." << std::endl;
-    }
-}
-
-void Server::AddNewClientToTable(const ClientInfo &client)
-{
-    std::lock_guard<std::mutex> guard(tableMutex); // Garante exclusão mútua ao acessar a tabela
-
-    // Verifica se o cliente já existe na tabela pelo hostname
-    auto it = std::find_if(clientTable.begin(), clientTable.end(), [&](const ClientInfo &existingClient)
-                           { return existingClient.hostname == client.hostname; });
-
-    if (it == clientTable.end())
-    {
-        // Cliente não encontrado na tabela, pode adicionar
-        clientTable.push_back(client);
-        std::cout << "Added new client to the table: " << client.hostname << std::endl;
-    }
-    else
-    {
-        // Cliente já existe na tabela, atualiza seus dados se necessário
-        *it = client;
-        std::cout << "Updated existing client in the table: " << client.hostname << std::endl;
-    }
-}
-
-void Server::AddClientToTable(struct sockaddr_in clientAddr)
-{
-    char clientIP[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(clientAddr.sin_addr), clientIP, INET_ADDRSTRLEN);
-    int clientPort = ntohs(clientAddr.sin_port);
-
-    std::lock_guard<std::mutex> guard(clientTableMutex);
-
-    // Adiciona cliente à tabela
-    clientsTable[clientIP] = clientPort;
-    std::cout << "Added client to table: " << clientIP << ":" << clientPort << std::endl;
+void Server::SendWoLCommand(const std::string& hostname) {
+    std::cout << "Sending WoL command to hostname: " << hostname << std::endl;
+    // Implemente aqui a lógica para enviar o comando WoL para o cliente
+    // Exemplo: use bibliotecas para enviar o pacote WoL para o cliente
 }
 
 void Server::PrintClientTable()
 {
-    std::lock_guard<std::mutex> guard(clientTableMutex);
-    if (clientsTable.empty())
+    // Implementação da função para imprimir a tabela de clientes
+    std::cout << "Printing client table:" << std::endl;
+    std::cout << "---------------------" << std::endl;
+    for (const auto& client : clientTable)
     {
-        std::cout << "Client table is empty." << std::endl;
+        std::cout << "Hostname: " << client.hostname << ", IP: " << client.ipAddress << ", Port: " << client.port << std::endl;
     }
-    else
-    {
-        std::cout << "Client table:" << std::endl;
-        for (const auto& client : clientsTable)
-        {
-            std::cout << client.first << ":" << client.second << std::endl;
-        }
-    }
-}
-
-void Server::ListenToClientDiscover()
-{
-    while (true)
-    {
-        char buffer[MAX_MESSAGE_SIZE];
-        struct sockaddr_in clientAddr;
-        socklen_t clientAddrLen = sizeof(clientAddr);
-        
-        // Receive discovery message
-        ssize_t bytesReceived = recvfrom(discoverSocket, buffer, MAX_MESSAGE_SIZE, 0,
-                                         (struct sockaddr *)&clientAddr, &clientAddrLen);
-        if (bytesReceived == -1)
-        {
-            perror("Error in receiving data from client");
-            continue;
-        }
-        
-        // Process discovery message
-        std::string message(buffer, bytesReceived);
-        if (message == "sleep service discovery")
-        {
-            std::cout << "Received discovery message from client: " << message << std::endl;
-            
-            // Add client to table
-            AddClientToTable(clientAddr);
-            
-            // Print client table
-            PrintClientTable();
-        }
-        else
-        {
-            std::cout << "Invalid discovery message format." << std::endl;
-        }
-    }
+    std::cout << "---------------------" << std::endl;
 }

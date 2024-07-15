@@ -1,22 +1,27 @@
 #include "ServerClass.h"
 #include "ClientClass.h"
+#include "global.hpp"
 #include <pthread.h>
 #include <iostream>
 #include <cstring>
 #include <unistd.h>
-#include "global.hpp"
+#include <chrono>
+#include <thread>
+#include <signal.h>
 
 pthread_mutex_t lock;
 
 static void *ThreadServerDiscover(void *arg)
 {
     Server *server = static_cast<Server *>(arg);
-    while (true)
+    while (isRunning) // Verifica se o servidor ainda está em execução
     {
-        server->ListenToClientDiscover();
+        server->ListenForDiscoveryMessages();
         pthread_mutex_lock(&lock);
-        server->PrintTable(); // Atualiza a tabela na tela do servidor
+        server->PrintClientTable(); // Corrigido para PrintClientTable
         pthread_mutex_unlock(&lock);
+
+        std::this_thread::sleep_for(std::chrono::seconds(5)); // Intervalo de 5 segundos entre impressões
     }
     return NULL;
 }
@@ -24,7 +29,7 @@ static void *ThreadServerDiscover(void *arg)
 static void *ThreadServerCommand(void *arg)
 {
     Server *server = static_cast<Server *>(arg);
-    while (true)
+    while (isRunning) // Verifica se o servidor ainda está em execução
     {
         std::string command;
         std::getline(std::cin, command);
@@ -32,11 +37,11 @@ static void *ThreadServerCommand(void *arg)
         if (command.substr(0, 7) == "WAKEUP ")
         {
             std::string hostname = command.substr(7);
-            // Implementar lógica para enviar comando WAKEUP para o cliente específico (usando WoL)
+            server->SendWoLCommand(hostname); // Chama SendWoLCommand na classe Server
         }
         else if (command == "EXIT")
         {
-            // Implementar lógica para encerrar o servidor de forma segura, se necessário
+            isRunning = false;
             break;
         }
     }
@@ -45,62 +50,56 @@ static void *ThreadServerCommand(void *arg)
 
 static void *ThreadClient(void *arg)
 {
-    Client client;
-    client.InitClientSocket();
-    client.SendDiscoveryMessage();
+    Client *client = static_cast<Client *>(arg);
+    client->SendDiscoveryMessages();
 
-    pthread_t tidStatus;
-    pthread_create(&tidStatus, NULL, [](void *arg) -> void *
-                   {
-        Client *client = static_cast<Client*>(arg);
-        client->ListenForStatusUpdates();
-        return NULL; }, &client);
-
-    while (true)
-    {
-        std::string command;
-        std::getline(std::cin, command);
-        client.ProcessCommand(command);
-    }
-
-    pthread_join(tidStatus, NULL);
     return NULL;
+}
+
+void handleSignal(int signal)
+{
+    if (signal == SIGINT)
+    {
+        std::cerr << "Ctrl+C pressed. Forcing exit." << std::endl;
+        exit(EXIT_FAILURE); // Força a saída imediata do programa
+    }
 }
 
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
+    signal(SIGINT, handleSignal); // Configura o tratamento do sinal SIGINT (Ctrl+C)
+
+    if (argc < 1 || argc > 2)
     {
-        std::cerr << "Usage: " << argv[0] << " <mode>" << std::endl;
-        std::cerr << "Modes: 'manager' for server, 'client' for client" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " [manager]" << std::endl;
         return 1;
     }
 
-    std::string mode = argv[1];
+    std::string role = (argc == 2) ? argv[1] : "client";
 
-    if (mode == "manager")
+    if (role == "manager")
     {
         Server server;
-        if (server.InitServerSocket() == -1)
-        {
-            return 1;
-        }
+        server.InitServerSocket();
+        pthread_t tidDiscover, tidCommand;
+        pthread_create(&tidDiscover, NULL, ThreadServerDiscover, &server);
+        pthread_create(&tidCommand, NULL, ThreadServerCommand, &server);
 
-        pthread_t tid[2];
-        pthread_create(&tid[0], NULL, ThreadServerDiscover, &server);
-        pthread_create(&tid[1], NULL, ThreadServerCommand, &server);
-        pthread_join(tid[0], NULL);
-        pthread_join(tid[1], NULL);
+        pthread_join(tidDiscover, NULL);
+        pthread_join(tidCommand, NULL);
     }
-    else if (mode == "client")
+    else if (role == "client")
     {
-        pthread_t tid;
-        pthread_create(&tid, NULL, ThreadClient, NULL);
-        pthread_join(tid, NULL);
+        Client client;
+        client.InitDiscoverSocket();
+        pthread_t tidClient;
+        pthread_create(&tidClient, NULL, ThreadClient, &client);
+
+        pthread_join(tidClient, NULL);
     }
     else
     {
-        std::cerr << "Invalid mode. Use 'manager' for server, 'client' for client." << std::endl;
+        std::cerr << "Invalid role: " << role << std::endl;
         return 1;
     }
 
