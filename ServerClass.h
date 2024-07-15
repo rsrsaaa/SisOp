@@ -5,6 +5,9 @@
 #include <vector>
 #include <mutex>
 #include "global.hpp"
+#include <string>
+#include <unordered_map>
+
 
 
 struct ClientInfo
@@ -30,12 +33,18 @@ public:
     void PrintTable();
     void UpdateClientStatus(const std::string &hostname, const std::string &status);
     void AddNewClientToTable(const ClientInfo &client);
+    void AddClientToTable(struct sockaddr_in clientAddr);
+    void PrintClientTable();
 
 private:
     std::vector<ClientInfo> clientTable;
     std::mutex tableMutex;
     int discoverSocket; // Socket UDP para comunicação de descoberta
     int statusSocket;   // Socket UDP para comunicação de status
+    struct sockaddr_in discoverServerAddr;
+    struct sockaddr_in statusServerAddr;
+    std::unordered_map<std::string, int> clientsTable;  // Tabela de clientes
+    std::mutex clientTableMutex;  // Mutex para proteção da tabela de clientes
 };
 
 #endif // SERVERCLASS_H

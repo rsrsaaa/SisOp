@@ -13,6 +13,59 @@ Server::Server()
     statusSocket = 0;
 }
 
+int Server::InitServerSocket()
+{
+    // Inicializa o socket UDP para descoberta
+    if ((discoverSocket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+    {
+        std::cerr << "Failed to create discover server socket." << std::endl;
+        return -1;
+    }
+
+    struct sockaddr_in discoverAddr;
+    std::memset(&discoverAddr, 0, sizeof(discoverAddr));
+
+    discoverAddr.sin_family = AF_INET;
+    discoverAddr.sin_addr.s_addr = INADDR_ANY;
+    discoverAddr.sin_port = htons(DISCOVER_PORT);
+
+    // Associa o socket à porta e ao endereço para descoberta
+    if (bind(discoverSocket, (struct sockaddr *)&discoverAddr, sizeof(discoverAddr)) == -1)
+    {
+        std::cerr << "Failed to bind discover server socket." << std::endl;
+        close(discoverSocket);
+        return -1;
+    }
+
+    std::cout << "Discover server socket initialized and listening on port " << DISCOVER_PORT << std::endl;
+
+    // Inicializa o socket UDP para status
+    if ((statusSocket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+    {
+        std::cerr << "Failed to create status server socket." << std::endl;
+        return -1;
+    }
+
+    struct sockaddr_in statusAddr;
+    std::memset(&statusAddr, 0, sizeof(statusAddr));
+
+    statusAddr.sin_family = AF_INET;
+    statusAddr.sin_addr.s_addr = INADDR_ANY;
+    statusAddr.sin_port = htons(STATUS_PORT);
+
+    // Associa o socket à porta e ao endereço para status
+    if (bind(statusSocket, (struct sockaddr *)&statusAddr, sizeof(statusAddr)) == -1)
+    {
+        std::cerr << "Failed to bind status server socket." << std::endl;
+        close(statusSocket);
+        return -1;
+    }
+
+    std::cout << "Status server socket initialized and listening on port " << STATUS_PORT << std::endl;
+
+    return 0;
+}
+
 // Exemplo de melhoria na função de inicialização do socket de descoberta
 int Server::InitDiscoverSocket()
 {
@@ -96,140 +149,6 @@ void Server::UpdateClientTable(const std::string &hostname, const std::string &i
         newClient.macAddress = mac;
         newClient.status = status;
         clientTable.push_back(newClient);
-    }
-}
-
-int Server::InitServerSocket()
-{
-    // Inicializa o socket UDP para descoberta
-    if ((discoverSocket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-    {
-        std::cerr << "Failed to create discover server socket." << std::endl;
-        return -1;
-    }
-
-    struct sockaddr_in discoverAddr;
-    std::memset(&discoverAddr, 0, sizeof(discoverAddr));
-
-    discoverAddr.sin_family = AF_INET;
-    discoverAddr.sin_addr.s_addr = INADDR_ANY;
-    discoverAddr.sin_port = htons(DISCOVER_PORT);
-
-    // Associa o socket à porta e ao endereço para descoberta
-    if (bind(discoverSocket, (struct sockaddr *)&discoverAddr, sizeof(discoverAddr)) == -1)
-    {
-        std::cerr << "Failed to bind discover server socket." << std::endl;
-        close(discoverSocket);
-        return -1;
-    }
-
-    std::cout << "Discover server socket initialized and listening on port " << DISCOVER_PORT << std::endl;
-
-    // Inicializa o socket UDP para status
-    if ((statusSocket = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
-    {
-        std::cerr << "Failed to create status server socket." << std::endl;
-        return -1;
-    }
-
-    struct sockaddr_in statusAddr;
-    std::memset(&statusAddr, 0, sizeof(statusAddr));
-
-    statusAddr.sin_family = AF_INET;
-    statusAddr.sin_addr.s_addr = INADDR_ANY;
-    statusAddr.sin_port = htons(STATUS_PORT);
-
-    // Associa o socket à porta e ao endereço para status
-    if (bind(statusSocket, (struct sockaddr *)&statusAddr, sizeof(statusAddr)) == -1)
-    {
-        std::cerr << "Failed to bind status server socket." << std::endl;
-        close(statusSocket);
-        return -1;
-    }
-
-    std::cout << "Status server socket initialized and listening on port " << STATUS_PORT << std::endl;
-
-    return 0;
-}
-
-void Server::ListenToClientDiscover()
-{
-    struct sockaddr_in clientAddr;
-    socklen_t clientAddrLen = sizeof(clientAddr);
-    char buffer[1024] = {0};
-
-    // Aguarda por mensagens de descoberta dos clientes
-    ssize_t numBytes = recvfrom(discoverSocket, buffer, sizeof(buffer), 0, (struct sockaddr *)&clientAddr, &clientAddrLen);
-    if (numBytes == -1)
-    {
-        std::cerr << "Error receiving discover data from client." << std::endl;
-    }
-    else
-    {
-        std::cout << "Received discovery message from client: " << buffer << std::endl;
-
-        // Processa a mensagem recebida do cliente e atualiza a tabela de clientes, se necessário
-        std::string message(buffer);
-
-        // Exemplo de processamento da mensagem
-        // Supondo que a mensagem esteja no formato "hostname;ip;mac;status"
-        std::string delimiter = ";";
-        size_t pos = 0;
-        std::string token;
-        std::vector<std::string> tokens;
-
-        while ((pos = message.find(delimiter)) != std::string::npos)
-        {
-            token = message.substr(0, pos);
-            tokens.push_back(token);
-            message.erase(0, pos + delimiter.length());
-        }
-        tokens.push_back(message); // Último token após o último delimitador
-
-        if (tokens.size() == 4)
-        {
-            std::string hostname = tokens[0];
-            std::string ip = tokens[1];
-            std::string mac = tokens[2];
-            std::string status = tokens[3];
-
-            // Mutex para garantir operação segura na tabela de clientes
-            std::lock_guard<std::mutex> guard(tableMutex);
-
-            // Verifica se o cliente já existe na tabela
-            bool found = false;
-            for (auto &client : clientTable)
-            {
-                if (client.hostname == hostname)
-                {
-                    // Atualiza o status do cliente
-                    client.status = status;
-                    found = true;
-                    break;
-                }
-            }
-
-            // Se não encontrou, adiciona o cliente à tabela
-            if (!found)
-            {
-                ClientInfo newClient;
-                newClient.hostname = hostname;
-                newClient.ipAddress = ip;
-                newClient.macAddress = mac;
-                newClient.status = status;
-                clientTable.push_back(newClient);
-            }
-
-            // Atualizações adicionais conforme necessário
-            // Por exemplo, atualizar timestamp, contadores, etc.
-        }
-        else
-        {
-            std::cerr << "Invalid discovery message format." << std::endl;
-        }
-
-        // Exibe a tabela atualizada
-        PrintTable();
     }
 }
 
@@ -348,5 +267,71 @@ void Server::AddNewClientToTable(const ClientInfo &client)
         // Cliente já existe na tabela, atualiza seus dados se necessário
         *it = client;
         std::cout << "Updated existing client in the table: " << client.hostname << std::endl;
+    }
+}
+
+void Server::AddClientToTable(struct sockaddr_in clientAddr)
+{
+    char clientIP[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(clientAddr.sin_addr), clientIP, INET_ADDRSTRLEN);
+    int clientPort = ntohs(clientAddr.sin_port);
+
+    std::lock_guard<std::mutex> guard(clientTableMutex);
+
+    // Adiciona cliente à tabela
+    clientsTable[clientIP] = clientPort;
+    std::cout << "Added client to table: " << clientIP << ":" << clientPort << std::endl;
+}
+
+void Server::PrintClientTable()
+{
+    std::lock_guard<std::mutex> guard(clientTableMutex);
+    if (clientsTable.empty())
+    {
+        std::cout << "Client table is empty." << std::endl;
+    }
+    else
+    {
+        std::cout << "Client table:" << std::endl;
+        for (const auto& client : clientsTable)
+        {
+            std::cout << client.first << ":" << client.second << std::endl;
+        }
+    }
+}
+
+void Server::ListenToClientDiscover()
+{
+    while (true)
+    {
+        char buffer[MAX_MESSAGE_SIZE];
+        struct sockaddr_in clientAddr;
+        socklen_t clientAddrLen = sizeof(clientAddr);
+        
+        // Receive discovery message
+        ssize_t bytesReceived = recvfrom(discoverSocket, buffer, MAX_MESSAGE_SIZE, 0,
+                                         (struct sockaddr *)&clientAddr, &clientAddrLen);
+        if (bytesReceived == -1)
+        {
+            perror("Error in receiving data from client");
+            continue;
+        }
+        
+        // Process discovery message
+        std::string message(buffer, bytesReceived);
+        if (message == "sleep service discovery")
+        {
+            std::cout << "Received discovery message from client: " << message << std::endl;
+            
+            // Add client to table
+            AddClientToTable(clientAddr);
+            
+            // Print client table
+            PrintClientTable();
+        }
+        else
+        {
+            std::cout << "Invalid discovery message format." << std::endl;
+        }
     }
 }

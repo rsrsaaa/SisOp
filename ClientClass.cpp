@@ -45,12 +45,11 @@ void Client::InitClientSocket()
 
 void Client::SendDiscoveryMessage()
 {
-    std::string discoveryMessage = "sleep service discovery";
-    std::lock_guard<std::mutex> guard(socketMutex); // Garante exclusão mútua
+    const char *message = "sleep service discovery";
+    int messageLen = std::strlen(message);
 
-    ssize_t sentBytes = sendto(discoverSocket, discoveryMessage.c_str(), discoveryMessage.length(), 0,
-                               (struct sockaddr *)&serverAddrDiscover, sizeof(serverAddrDiscover));
-    if (sentBytes == -1)
+    if (sendto(discoverSocket, message, messageLen, 0,
+               (struct sockaddr *)&serverAddrDiscover, sizeof(serverAddrDiscover)) == -1)
     {
         std::cerr << "Failed to send discovery message." << std::endl;
     }
