@@ -4,8 +4,8 @@
 #include <string>
 #include <netinet/in.h>
 
-#define DISCOVER_PORT 50000
-#define STATUS_PORT 51000
+#define DISCOVER_PORT 53000
+#define STATUS_PORT 52000
 
 struct managementTable
 {

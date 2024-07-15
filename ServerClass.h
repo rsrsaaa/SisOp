@@ -22,8 +22,11 @@ class Server
 {
 public:
     Server();
+    int InitDiscoverSocket();
+    void UpdateClientTable(const std::string &hostname, const std::string &ip, const std::string &mac, const std::string &status);
     int InitServerSocket();
     void ListenToClientDiscover();
+    void ProcessDiscoveryMessage(const std::string &message);
     void SendStatusRequest();
     void PrintTable();
     void UpdateClientStatus(const std::string &hostname, const std::string &status);
