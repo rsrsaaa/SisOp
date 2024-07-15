@@ -1,126 +1,236 @@
+#include "ServerClass.h"
+#include <iostream>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <cstring>
 #include "global.hpp"
-// #include <arpa/inet.h>
-class Server 
-{
-public:
-    int newsockfd, n;
-	socklen_t clilen;
-	struct sockaddr_in serv_addr, cli_addr;
-	char buff[256];
+#include "../../../../usr/include/c++/11/bits/algorithmfwd.h"
 
+Server::Server() {
+    discoverSocket = 0;
+    statusSocket = 0;
+}
 
-    int InitServerSocket()
-    {
-        // Create socket
-        int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-        if (sockfd < 0) {
-            perror("Error opening socket");
-            exit(1);
-        }
-        int broadcastEnable = 1;
-        if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0) {
-            perror("Error setting socket option");
-            exit(1);
-        }
-        memset((char *) &serv_addr, 0, sizeof(serv_addr));
-        serv_addr.sin_family = AF_INET;
-        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        serv_addr.sin_port = htons(DISCOVER_PORT);
-        if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-            perror("Error binding socket");
-            exit(1);
-        }
-        return sockfd;
+int Server::InitServerSocket() {
+    // Inicializa o socket UDP para descoberta
+    if ((discoverSocket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        std::cerr << "Failed to create discover server socket." << std::endl;
+        return -1;
     }
 
-    string ListenToClientDiscover(int sockfd)
-    {
-        cout<<"rodando"<<endl;
-        listen(sockfd, 5);
-        clilen = sizeof(cli_addr);
-        // Accept incoming connections
-        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-        if (newsockfd < 0) {
-            perror("Error accepting connection");
-            exit(1);
-        }
-        // Read data from client
-        cout<<"esperando dados do cliente"<<endl;
-        bzero(buff, sizeof(buff));
-        n = read(newsockfd, buff, sizeof(buff));
-        if (n < 0) {
-            perror("Error reading from socket");
-            exit(1);
-        }
-        return buff;
+    struct sockaddr_in discoverAddr;
+    std::memset(&discoverAddr, 0, sizeof(discoverAddr));
+
+    discoverAddr.sin_family = AF_INET;
+    discoverAddr.sin_addr.s_addr = INADDR_ANY;
+    discoverAddr.sin_port = htons(DISCOVER_PORT);
+
+    // Associa o socket à porta e ao endereço para descoberta
+    if (bind(discoverSocket, (struct sockaddr *)&discoverAddr, sizeof(discoverAddr)) == -1) {
+        std::cerr << "Failed to bind discover server socket." << std::endl;
+        close(discoverSocket);
+        return -1;
     }
 
-    void AddNewClientToTable()
-    {
-        cout<<"adicionando novo cliente"<<endl;
-        for (int i = 0; i < 3; i++)
-        {
-            
-            if(table[i].ip == " ")
-            {
-                table[i].mac = reinterpret_cast<const char*>(cli_addr.sin_zero);
-                table[i].name = inet_ntoa(cli_addr.sin_addr);
-                table[i].port = cli_addr.sin_port;
-                table[i].ip = inet_ntoa(cli_addr.sin_addr);
-                table[i].status = "AWAKEN";
-                break;
-            }
-        }
-        close(newsockfd);
+    std::cout << "Discover server socket initialized and listening on port " << DISCOVER_PORT << std::endl;
+
+    // Inicializa o socket UDP para status
+    if ((statusSocket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        std::cerr << "Failed to create status server socket." << std::endl;
+        return -1;
     }
-    void SendStatusRequest()
-    {
-        for (int i = 0; i < 3; i++)
-        {
-            if (table[i].ip != " ")
-            {
-                char message[] = "sleep status request";
-                // Create a new socket for sending messages
-                int sendSocket = socket(AF_INET, SOCK_STREAM, 0);
-                if (sendSocket < 0) {
-                    perror("Error opening send socket");
-                    exit(1);
+
+    struct sockaddr_in statusAddr;
+    std::memset(&statusAddr, 0, sizeof(statusAddr));
+
+    statusAddr.sin_family = AF_INET;
+    statusAddr.sin_addr.s_addr = INADDR_ANY;
+    statusAddr.sin_port = htons(STATUS_PORT);
+
+    // Associa o socket à porta e ao endereço para status
+    if (bind(statusSocket, (struct sockaddr *)&statusAddr, sizeof(statusAddr)) == -1) {
+        std::cerr << "Failed to bind status server socket." << std::endl;
+        close(statusSocket);
+        return -1;
+    }
+
+    std::cout << "Status server socket initialized and listening on port " << STATUS_PORT << std::endl;
+
+    return 0;
+}
+
+void Server::ListenToClientDiscover() {
+    struct sockaddr_in clientAddr;
+    socklen_t clientAddrLen = sizeof(clientAddr);
+    char buffer[1024] = {0};
+
+    // Aguarda por mensagens de descoberta dos clientes
+    ssize_t numBytes = recvfrom(discoverSocket, buffer, sizeof(buffer), 0, (struct sockaddr *)&clientAddr, &clientAddrLen);
+    if (numBytes == -1) {
+        std::cerr << "Error receiving discover data from client." << std::endl;
+    } else {
+        std::cout << "Received discovery message from client: " << buffer << std::endl;
+
+        // Processa a mensagem recebida do cliente e atualiza a tabela de clientes, se necessário
+        std::string message(buffer);
+
+        // Exemplo de processamento da mensagem
+        // Supondo que a mensagem esteja no formato "hostname;ip;mac;status"
+        std::string delimiter = ";";
+        size_t pos = 0;
+        std::string token;
+        std::vector<std::string> tokens;
+        
+        while ((pos = message.find(delimiter)) != std::string::npos) {
+            token = message.substr(0, pos);
+            tokens.push_back(token);
+            message.erase(0, pos + delimiter.length());
+        }
+        tokens.push_back(message); // Último token após o último delimitador
+
+        if (tokens.size() == 4) {
+            std::string hostname = tokens[0];
+            std::string ip = tokens[1];
+            std::string mac = tokens[2];
+            std::string status = tokens[3];
+
+            // Mutex para garantir operação segura na tabela de clientes
+            std::lock_guard<std::mutex> guard(tableMutex);
+
+            // Verifica se o cliente já existe na tabela
+            bool found = false;
+            for (auto &client : clientTable) {
+                if (client.hostname == hostname) {
+                    // Atualiza o status do cliente
+                    client.status = status;
+                    found = true;
+                    break;
                 }
-
-                // Set up the client address
-                struct sockaddr_in clientAddr;
-                memset((char *) &clientAddr, 0, sizeof(clientAddr));
-                clientAddr.sin_family = AF_INET;
-
-                // Set the client IP and port
-                clientAddr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
-                clientAddr.sin_port = htons(STATUS_PORT);
-
-                // Connect to the client
-                if (connect(sendSocket, (struct sockaddr *) &clientAddr, sizeof(clientAddr)) < 0) {
-                    table[i].status = "SLEEPING";
-                }
-                else
-                {
-                    table[i].status = "AWAKEN";
-                }
-
-                // Close the connection to the client
-                close(sendSocket);
             }
+
+            // Se não encontrou, adiciona o cliente à tabela
+            if (!found) {
+                ClientInfo newClient;
+                newClient.hostname = hostname;
+                newClient.ipAddress = ip;
+                newClient.macAddress = mac;
+                newClient.status = status;
+                clientTable.push_back(newClient);
+            }
+
+            // Atualizações adicionais conforme necessário
+            // Por exemplo, atualizar timestamp, contadores, etc.
+        } else {
+            std::cerr << "Invalid discovery message format." << std::endl;
         }
+
+        // Exibe a tabela atualizada
+        PrintTable();
+    }
+}
+
+
+void Server::SendStatusRequest() {
+    // Preparação da mensagem de solicitação de status
+    std::string requestMessage = "status_request";
+
+    // Tamanho do buffer para a mensagem
+    const int bufferSize = 1024;
+    char buffer[bufferSize];
+
+    // Mutex para garantir operação segura na tabela de clientes
+    std::lock_guard<std::mutex> guard(tableMutex);
+
+    // Itera sobre a tabela de clientes e envia solicitação de status para cada um
+    for (const auto &client : clientTable) {
+        // Configuração do endereço do cliente
+        struct sockaddr_in clientAddr;
+        memset(&clientAddr, 0, sizeof(clientAddr));
+        clientAddr.sin_family = AF_INET;
+        clientAddr.sin_port = htons(DISCOVER_PORT); // Porta de descoberta
+        inet_pton(AF_INET, client.ipAddress.c_str(), &clientAddr.sin_addr);
+
+        // Criação do socket UDP para envio
+        int discoverSocket = socket(AF_INET, SOCK_DGRAM, 0);
+        if (discoverSocket == -1) {
+            std::cerr << "Failed to create discover socket." << std::endl;
+            continue; // Tenta enviar para o próximo cliente
+        }
+
+        // Envio da solicitação de status
+        ssize_t numBytesSent = sendto(discoverSocket, requestMessage.c_str(), requestMessage.length(), 0,
+                                      (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+        if (numBytesSent == -1) {
+            std::cerr << "Failed to send status request to client " << client.hostname << std::endl;
+        } else {
+            std::cout << "Sent status request to client " << client.hostname << std::endl;
+        }
+
+        // Fecha o socket após o envio
+        close(discoverSocket);
+    }
+}
+
+void Server::PrintTable() {
+    std::lock_guard<std::mutex> guard(tableMutex); // Garante exclusão mútua ao acessar a tabela
+
+    // Verifica se há clientes na tabela
+    if (clientTable.empty()) {
+        std::cout << "Client table is empty." << std::endl;
+        return;
     }
 
-    void PrintTable()
-    {
-        cout << "Name\t\tIP\t\tMAC\t\tStatus\t\tPort" << endl;
-        for (int i = 0; i < 3; i++)
-        {
-            if (table[i].ip != " ")
-            {
-                cout << table[i].name << "\t" << table[i].ip << "\t" << table[i].mac << "\t" << table[i].status << "\t" << table[i].port << endl;
-            }
-        }
-    }
-};
+    // Imprime cabeçalho da tabela
+    std::cout << "================ Client Table ================" << std::endl;
+    std::cout << "Hostname\tIP Address\tMAC Address\tStatus" << std::endl;
 
+    // Itera sobre a tabela de clientes e imprime cada cliente
+    for (const auto &client : clientTable) {
+        std::cout << client.hostname << "\t"
+                  << client.ipAddress << "\t"
+                  << client.macAddress << "\t"
+                  << client.status << std::endl;
+    }
+
+    // Imprime rodapé da tabela
+    std::cout << "==============================================" << std::endl;
+}
+
+
+void Server::UpdateClientStatus(const std::string &hostname, const std::string &status) {
+    std::lock_guard<std::mutex> guard(tableMutex); // Garante exclusão mútua ao acessar a tabela
+
+    // Procura o cliente na tabela pelo hostname
+    auto it = std::find_if(clientTable.begin(), clientTable.end(), [&](const ClientInfo &client) {
+        return client.hostname == hostname;
+    });
+
+    if (it != clientTable.end()) {
+        // Atualiza o status do cliente encontrado
+        it->status = status;
+        std::cout << "Updated status of client " << hostname << " to " << status << std::endl;
+    } else {
+        // Cliente não encontrado na tabela
+        std::cerr << "Client " << hostname << " not found in client table." << std::endl;
+    }
+}
+
+
+void Server::AddNewClientToTable(const ClientInfo &client) {
+    std::lock_guard<std::mutex> guard(tableMutex); // Garante exclusão mútua ao acessar a tabela
+
+    // Verifica se o cliente já existe na tabela pelo hostname
+    auto it = std::find_if(clientTable.begin(), clientTable.end(), [&](const ClientInfo &existingClient) {
+        return existingClient.hostname == client.hostname;
+    });
+
+    if (it == clientTable.end()) {
+        // Cliente não encontrado na tabela, pode adicionar
+        clientTable.push_back(client);
+        std::cout << "Added new client to the table: " << client.hostname << std::endl;
+    } else {
+        // Cliente já existe na tabela, atualiza seus dados se necessário
+        *it = client;
+        std::cout << "Updated existing client in the table: " << client.hostname << std::endl;
+    }
+}

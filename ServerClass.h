@@ -1,0 +1,39 @@
+#ifndef SERVERCLASS_H
+#define SERVERCLASS_H
+
+#include <string>
+#include <vector>
+#include <mutex>
+
+#define DISCOVER_PORT 53000 // Defina a porta de descoberta UDP aqui
+#define STATUS_PORT 52000   // Defina a porta de status UDP aqui
+
+struct ClientInfo
+{
+    std::string hostname;
+    std::string macAddress;
+    std::string ipAddress;
+    std::string status;
+
+    friend std::ostream &operator<<(std::ostream &os, const ClientInfo &client);
+};
+
+class Server
+{
+public:
+    Server();
+    int InitServerSocket();
+    void ListenToClientDiscover();
+    void SendStatusRequest();
+    void PrintTable();
+    void UpdateClientStatus(const std::string &hostname, const std::string &status);
+    void AddNewClientToTable(const ClientInfo &client);
+
+private:
+    std::vector<ClientInfo> clientTable;
+    std::mutex tableMutex;
+    int discoverSocket; // Socket UDP para comunicação de descoberta
+    int statusSocket;   // Socket UDP para comunicação de status
+};
+
+#endif // SERVERCLASS_H
