@@ -1,63 +1,44 @@
-#include "ServerClass.cpp"
-#include "ClientClass.cpp"
+#include "global.hpp"
+#include "Management.hpp"
+#include "Monitoring.hpp"
+#include "Discovery.hpp"
+#include "Interface.hpp"
+#include <thread>
+#include <iostream>
 
-pthread_mutex_t lock;
+using namespace std;
 
-static void ThreadServerDiscover(void *arg) {
-    Server server;
-    string confirmDiscover;     
-    int socket = server.InitServerSocket();
-    while (1) {
-        confirmDiscover = server.ListenToClientDiscover(socket);
-        if (confirmDiscover == "sleep discovery service") {
-            pthread_mutex_lock(&lock);
-            server.AddNewClientToTable();
-            pthread_mutex_unlock(&lock);
-        }
-    }
-}
+pthread_mutex_t lock; // Definição do mutex
+vector<managementTable> table(MAX_CLIENTS); // Definição da tabela de clientes
 
-static void ThreadServerSleepStatus(void *arg) {
-    while (1) {
-        Server server;
-        pthread_mutex_lock(&lock);
-        server.SendStatusRequest();
-        pthread_mutex_unlock(&lock);
-        sleep(5);
-        clearscreen();
-        server.PrintTable();
-    }
-}
+// Instâncias dos gerenciadores e subserviços
+ClientManager clientManager;
+MonitoringService monitoringService;
+DiscoveryService discoveryService;
+InterfaceService interfaceService;
 
-int main(int argc, char *argv[]) {
-    pthread_attr_t attr;
-    void *res;
-    int ret;
+// Função principal para inicialização e gerenciamento das threads
+int main() {
+    // Inicialização dos subserviços
+    // Aqui você pode inicializar os dados iniciais, se necessário
+    
+    // Inicializar o mutex
+    pthread_mutex_init(&lock, nullptr);
 
-    if (argc > 1) {
-        if (strcmp(argv[1], "manager") == 0) {
-            pthread_t threadServerDiscover, threadServerSleepStatus;
-            ret = pthread_mutex_init(&lock, NULL);
-            if (ret != 0)
-                handle_error_en(ret, "pthread_mutex_init");
-            ret = pthread_attr_init(&attr);
-            if (ret != 0)
-                handle_error_en(ret, "pthread_attr_init");
-            ret = pthread_create(&threadServerDiscover, NULL, (void *(*)(void *))ThreadServerDiscover, NULL);
-            if (ret != 0)
-                handle_error_en(ret, "pthread_create");
-            ret = pthread_create(&threadServerSleepStatus, NULL, (void *(*)(void *))ThreadServerSleepStatus, NULL);
-            if (ret != 0)
-                handle_error_en(ret, "pthread_create");
-            pthread_join(threadServerDiscover, NULL);
-            pthread_join(threadServerSleepStatus, NULL);
-        }
-    } else {
-        Client client;
-        client.InitClientSocket();
-        client.SendRequestToServer();
-        client.ListenToServer();
-    }
+    // Threads para os subserviços com proteção mutex
+    thread managementThread(&ClientManager::run, &clientManager);
+    thread monitoringThread(&MonitoringService::run, &monitoringService);
+    thread discoveryThread(&DiscoveryService::run, &discoveryService);
+    thread interfaceThread(&InterfaceService::run, &interfaceService);
+
+    // Espera até que todas as threads terminem
+    managementThread.join();
+    monitoringThread.join();
+    discoveryThread.join();
+    interfaceThread.join();
+
+    // Destruir o mutex
+    pthread_mutex_destroy(&lock);
 
     return 0;
 }

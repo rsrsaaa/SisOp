@@ -1,66 +1,47 @@
+// global.hpp
+
 #pragma once
+
 #include <iostream>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <string.h>
-#include <netinet/in.h>
-#include <stdlib.h>
-#include <netdb.h>
-#include <sys/types.h>
+#include <string>
+#include <vector>
+#include <mutex>
 
 using namespace std;
+
 #define DISCOVER_PORT 53000
 #define STATUS_PORT 52000
-
-unsigned short calculate_checksum(void *b, int len)
-{
-    unsigned short *buf = static_cast<unsigned short *>(b);
-    unsigned int sum = 0;
-    unsigned short result;
-
-    for (sum = 0; len > 1; len -= 2)
-        sum += *buf++;
-    if (len == 1)
-        sum += *(unsigned char *)buf;
-    sum = (sum >> 16) + (sum & 0xFFFF);
-    sum += (sum >> 16);
-    result = ~sum;
-    return result;
-}
+#define MAX_MESSAGE_SIZE 1024
+#define MAX_CLIENTS 10
+extern int clientNum;
 
 struct managementTable
 {
-    string name = " ";
-    string ip = " ";
-    string mac = " ";
-    string status = " ";
-    int port = 0;
+    string name;
+    string ip;
+    string mac;
+    string status;
+    int port;
 };
-managementTable table[3];
-int clientNum = 0;
-void clearscreen()
-{
-#ifdef _WIN32
-    system("cls");
 
-#elif _POSIX_C_SOURCE >= 199309L
-    system("clear");
+class ClientManager {
+private:
+    vector<managementTable> clientTable;
+    mutex tableMutex;
 
-#endif
-}
+public:
+    ClientManager();
 
-#define handle_error_en(en, msg) \
-    do                           \
-    {                            \
-        errno = en;              \
-        perror(msg);             \
-        exit(EXIT_FAILURE);      \
-    } while (0)
+    void addClient(const managementTable& client);
+    void removeClient(const string& ip);
+    void updateClientStatus(const string& ip, const string& newStatus);
+    vector<managementTable> getClientTable();
+    void refreshClientStatus();
+    bool isClientAwake(const string &ip);
+    string pingClient(const string &ip);
+};
 
-#define handle_error(msg)   \
-    do                      \
-    {                       \
-        perror(msg);        \
-        exit(EXIT_FAILURE); \
-    } while (0)
+extern pthread_mutex_t lock; // Declaração do mutex
+
+// Função para limpar a tela, dependendo do sistema operacional
+void clearScreen();
