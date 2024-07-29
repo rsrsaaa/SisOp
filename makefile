@@ -1,25 +1,19 @@
-# Definindo o compilador e as flags
-CC = g++
-CFLAGS = -Wall -Wextra -std=c++11 -pthread
+CXX = g++
+CXXFLAGS = -std=c++11 -pthread
+LDFLAGS = -lpthread
+SOURCES = Client.cpp Discovery.cpp global.cpp Interface.cpp Management.cpp Monitoring.cpp Server.cpp sleep_server.cpp
+OBJECTS = $(SOURCES:.cpp=.o)
+TARGET = sleep_server
 
-# Arquivos fontes e objetos
-SRCS = SleepServer.cpp Discovery.cpp Management.cpp Monitoring.cpp Interface.cpp Server.cpp Client.cpp global.cpp
-OBJS = $(SRCS:.cpp=.o)
-
-# Nome do executável
-TARGET = SleepServer
-
-# Regra principal para criar o executável
 all: $(TARGET)
 
-# Regra para criar o executável a partir dos objetos
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+$(TARGET): $(OBJECTS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJECTS) $(LDFLAGS)
 
-# Regra para compilar os arquivos fonte em objetos
 %.o: %.cpp
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Limpar arquivos objetos e o executável
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJECTS) $(TARGET)
+
+.PHONY: all clean

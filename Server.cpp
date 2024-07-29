@@ -1,16 +1,13 @@
 #include "Server.hpp"
 #include "global.hpp"
 #include <iostream>
-#include <netinet/in.h>
+#include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
-#include <unistd.h>
 #include <cstring>
-#include <thread>
-#include <chrono>
+#include <unistd.h> // Adicione para close()
 
 using namespace std;
 
-// Inicializa o socket do servidor
 int Server::InitServerSocket() {
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
@@ -18,9 +15,17 @@ int Server::InitServerSocket() {
         exit(1);
     }
 
+    int reuse = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        perror("setsockopt(SO_REUSEADDR) failed");
+        close(sockfd);
+        exit(1);
+    }
+
     int broadcastEnable = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0) {
         perror("Error setting socket option");
+        close(sockfd);
         exit(1);
     }
 
@@ -28,38 +33,37 @@ int Server::InitServerSocket() {
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(DISCOVER_PORT);
-
     if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
         perror("Error binding socket");
+        close(sockfd);
         exit(1);
     }
-
     return sockfd;
 }
 
-// Escuta mensagens de descoberta do cliente
 string Server::ListenToClientDiscover(int sockfd) {
     cout << "rodando" << endl;
     clilen = sizeof(cli_addr);
+    unsigned int length;
+    cout << "esperando dados do cliente" << endl;
     bzero(buff, sizeof(buff));
-    
-    int n = recvfrom(sockfd, buff, sizeof(buff), 0, (struct sockaddr *) &cli_addr, &clilen);
+    length = sizeof(struct sockaddr_in);
+    n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *) &cli_addr, &length);
     if (n < 0) {
         perror("Error reading from socket");
         exit(1);
     }
-    
-    return string(buff);
+    return string(buff); // Corrija para retornar uma string
 }
 
-// Adiciona um novo cliente à tabela
 void Server::AddNewClientToTable() {
     cout << "adicionando novo cliente" << endl;
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (table[i].ip.empty()) {
-            table[i].mac = inet_ntoa(cli_addr.sin_addr); // Note: you might need to change how you store MAC addresses
+    for (int i = 0; i < 3; i++) {
+        if (table[i].ip == " ") {
+            // Simulação do MAC, pode precisar de uma forma correta de obter o MAC
+            table[i].mac = "MAC_Address"; 
             table[i].name = inet_ntoa(cli_addr.sin_addr);
-            table[i].port = ntohs(cli_addr.sin_port);
+            table[i].port = ntohs(cli_addr.sin_port); // Corrija a conversão da porta
             table[i].ip = inet_ntoa(cli_addr.sin_addr);
             table[i].status = "AWAKEN";
             break;
@@ -67,10 +71,9 @@ void Server::AddNewClientToTable() {
     }
 }
 
-// Envia uma solicitação de status para todos os clientes
 void Server::SendStatusRequest() {
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (!table[i].ip.empty()) {
+    for (int i = 0; i < 3; i++) {
+        if (table[i].ip != " ") {
             int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
             if (sockfd < 0) {
                 perror("Error opening socket");
@@ -84,7 +87,7 @@ void Server::SendStatusRequest() {
             dest_addr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
 
             const char *status_request = "sleep status request";
-            int n = sendto(sockfd, status_request, strlen(status_request), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+            n = sendto(sockfd, status_request, strlen(status_request), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
             if (n < 0) {
                 perror("Error sending status request");
                 close(sockfd);
@@ -95,11 +98,13 @@ void Server::SendStatusRequest() {
             struct timeval timeout;
             timeout.tv_sec = 5;
             timeout.tv_usec = 0;
-            setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
+            if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0) {
+                perror("setsockopt(SO_RCVTIMEO) failed");
+            }
 
             struct sockaddr_in from;
             socklen_t fromlen = sizeof(from);
-            n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&from, &fromlen);
+            n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&from, &fromlen);
             if (n < 0) {
                 table[i].status = "ASLEEP";
             } else {
@@ -111,42 +116,11 @@ void Server::SendStatusRequest() {
     }
 }
 
-// Imprime a tabela de clientes
 void Server::PrintTable() {
     cout << "Name\t\tIP\t\tMAC\t\tStatus\t\tPort" << endl;
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (!table[i].ip.empty()) {
+    for (int i = 0; i < 3; i++) {
+        if (table[i].ip != " ") {
             cout << table[i].name << "\t" << table[i].ip << "\t" << table[i].mac << "\t\t" << table[i].status << "\t\t" << table[i].port << endl;
         }
     }
-}
-
-// Inicia o serviço de descoberta
-void Server::StartDiscovery() {
-    while (true) {
-        string message = ListenToClientDiscover(sockfd);
-        if (!message.empty()) {
-            AddNewClientToTable();
-            SendStatusRequest();
-            PrintTable();
-        }
-    }
-}
-
-// Atualiza o status dos clientes
-void Server::StartMonitoring() {
-    while (true) {
-        SendStatusRequest(); // Atualiza o status de todos os clientes
-        PrintTable(); // Atualiza a tela com a tabela de clientes
-        this_thread::sleep_for(chrono::seconds(5));
-    }
-}
-
-// Inicializa e gerencia todos os serviços
-void Server::StartManagement() {
-    thread discoveryThread(&Server::StartDiscovery, this);
-    thread monitoringThread(&Server::StartMonitoring, this);
-
-    discoveryThread.join();
-    monitoringThread.join();
 }
