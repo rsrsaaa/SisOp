@@ -1,5 +1,3 @@
-// global.hpp
-
 #pragma once
 
 #include <iostream>
@@ -13,8 +11,8 @@ using namespace std;
 #define STATUS_PORT 52000
 #define MAX_MESSAGE_SIZE 1024
 #define MAX_CLIENTS 10
-extern int clientNum;
 
+// Definição da estrutura managementTable
 struct managementTable
 {
     string name;
@@ -24,6 +22,12 @@ struct managementTable
     int port;
 };
 
+// Declarações externas
+extern vector<managementTable> table; // Declaração externa
+extern int clientNum; // Declaração externa
+extern pthread_mutex_t global_lock; // Declaração externa
+
+// Definição da classe ClientManager
 class ClientManager {
 private:
     vector<managementTable> clientTable;
@@ -40,8 +44,6 @@ public:
     bool isClientAwake(const string &ip);
     string pingClient(const string &ip);
 };
-
-extern pthread_mutex_t lock; // Declaração do mutex
 
 // Função para limpar a tela, dependendo do sistema operacional
 void clearScreen();

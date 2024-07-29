@@ -10,7 +10,8 @@
 
 class Server {
 private:
-managementTable table[3]; // Definição de 'table' como um array de managementTable
+    int sockfd;  // Adiciona sockfd como membro da classe
+    managementTable table[3]; // Definição de 'table' como um array de managementTable
 
 public:
     int newsockfd, n;
@@ -19,10 +20,14 @@ public:
     char buff[256];
 
     int InitServerSocket();
-    string ListenToClientDiscover(int sockfd);
+    std::string ListenToClientDiscover(int sockfd);
     void AddNewClientToTable();
     void SendStatusRequest();
     void PrintTable();
+
+    void StartDiscovery();
+    void StartMonitoring();
+    void StartManagement();
 };
 
 #endif // SERVER_HPP

@@ -9,8 +9,7 @@
 
 using namespace std;
 
-extern pthread_mutex_t lock;          // Mutex externo definido em global.hpp
-extern vector<managementTable> table; // Tabela de clientes definida em global.hpp
+extern pthread_mutex_t global_lock;   // Mutex externo definido em global.hpp
 
 void *ThreadDiscovery(void *arg)
 {
@@ -54,7 +53,7 @@ void *ThreadDiscovery(void *arg)
         DiscoveryMessage *msg = (DiscoveryMessage *)buffer;
         if (strcmp(msg->messageType, "sleep discovery service") == 0)
         {
-            pthread_mutex_lock(&lock); // Adiciona o endereço do mutex para bloquear
+            pthread_mutex_lock(&global_lock); // Adiciona o endereço do mutex para bloquear
             // Atualiza a tabela de clientes
             for (int i = 0; i < MAX_CLIENTS; ++i)
             {
@@ -67,7 +66,7 @@ void *ThreadDiscovery(void *arg)
                     break;
                 }
             }
-            pthread_mutex_unlock(&lock); // Adiciona o endereço do mutex para desbloquear
+            pthread_mutex_unlock(&global_lock); // Adiciona o endereço do mutex para desbloquear
         }
     }
 

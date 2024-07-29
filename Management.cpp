@@ -3,11 +3,8 @@
 #include <cstdlib>    // Para system()
 #include <sstream>    // Para stringstream
 
-using namespace std;
+ClientManager clientManager; // Definição do clientManager
 
-// Implementação dos métodos da classe ClientManager
-
-// Construtor padrão da classe ClientManager
 ClientManager::ClientManager() {}
 
 // Adicionar um novo cliente à tabela
