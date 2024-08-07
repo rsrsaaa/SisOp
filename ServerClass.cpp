@@ -31,10 +31,8 @@ public:
     }
 
     string ListenToClientDiscover(int sockfd) {
-        cout << "rodando" << endl;
         clilen = sizeof(cli_addr);
         unsigned int length;
-        cout << "esperando dados do cliente" << endl;
         bzero(buff, sizeof(buff));
         length = sizeof(struct sockaddr_in);
         n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *) &cli_addr, &length);
@@ -46,7 +44,6 @@ public:
     }
 
     void AddNewClientToTable() {
-        cout << "adicionando novo cliente" << endl;
         for (int i = 0; i < 3; i++) {
             if (table[i].ip == " ") {
                 table[i].mac = reinterpret_cast<const char*>(cli_addr.sin_zero);

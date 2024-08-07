@@ -25,9 +25,34 @@ static void ThreadServerSleepStatus(void *arg)
         pthread_mutex_lock(&lock);
         server.SendStatusRequest();
         pthread_mutex_unlock(&lock);
-        sleep(5);
-        clearscreen();
-        server.PrintTable();
+    }
+}
+
+static void ThreadInterface(void *arg) 
+{
+    Server server;
+    int option = 0;
+    while (option != 3) 
+    {
+        cout << "1 - Mostrar tabela de Participantes" << endl << "2 - Wake On LAN" << endl << "3 - Desligar" << endl;
+        cin >> option;
+        switch (option)
+        {
+            case 1:
+                clearscreen();
+                server.PrintTable();
+                break;
+            case 2:
+                //server.WakeOnLAN(string IP);
+                break;
+            case 3:
+                //server.Shutdown();
+                break;
+            default:
+                cout << "Opção inválida" << endl;
+                break;
+        }
+        option = 0;
     }
 }
 
@@ -38,7 +63,7 @@ int main(int argc, char *argv[]) {
 
     if (argc > 1) {
         if (strcmp(argv[1], "manager") == 0) {
-            pthread_t threadServerDiscover, threadServerSleepStatus;
+            pthread_t threadServerDiscover, threadServerSleepStatus, threadInterface;
             ret = pthread_mutex_init(&lock, NULL);
             if (ret != 0)
                 handle_error_en(ret, "pthread_mutex_init");
@@ -51,8 +76,12 @@ int main(int argc, char *argv[]) {
             ret = pthread_create(&threadServerSleepStatus, NULL, (void *(*)(void *))ThreadServerSleepStatus, NULL);
             if (ret != 0)
                 handle_error_en(ret, "pthread_create");
+            ret = pthread_create(&threadInterface, NULL, (void *(*)(void *))ThreadInterface, NULL);
+            if (ret != 0)
+                handle_error_en(ret, "pthread_create");
             pthread_join(threadServerDiscover, NULL);
             pthread_join(threadServerSleepStatus, NULL);
+            pthread_join(threadInterface, NULL);
         }
     } else {
         Client client;
