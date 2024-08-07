@@ -1,0 +1,9 @@
+Para compilar e executar o manager rode os comandos no terminal:
+make clean
+make
+./mainApp manager
+
+Para compilar e executar participantes rode os comandos no terminal:
+make clean
+make
+./mainApp

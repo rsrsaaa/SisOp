@@ -3,7 +3,8 @@
 
 pthread_mutex_t lock;
 
-static void ThreadServerDiscover(void *arg) {
+static void ThreadServerDiscover(void *arg) 
+{
     Server server;
     string confirmDiscover;     
     int socket = server.InitServerSocket();
@@ -17,7 +18,8 @@ static void ThreadServerDiscover(void *arg) {
     }
 }
 
-static void ThreadServerSleepStatus(void *arg) {
+static void ThreadServerSleepStatus(void *arg) 
+{
     while (1) {
         Server server;
         pthread_mutex_lock(&lock);
