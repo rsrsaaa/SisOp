@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <netdb.h>
 #include <sys/types.h>
+#include <mutex>
+#include <thread>
 
 using namespace std;
 #define DISCOVER_PORT 53000
