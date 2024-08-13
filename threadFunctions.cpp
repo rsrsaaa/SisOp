@@ -72,4 +72,16 @@ void ThreadReplicationListen()
         client.ListenToReplication();
     }
 }
+
+void ThreadClientInterface() 
+{
+    Server client;
+    int option = 0;
+    while (1) 
+    {
+        clearscreen();
+        client.PrintTable();
+
+    }
+}
 //CLIENT THREADS END

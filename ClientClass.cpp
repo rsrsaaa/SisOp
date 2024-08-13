@@ -120,8 +120,28 @@ public:
                 continue;
             }
             
-            //montar mensagem pra ver como ela será desmontada aqui
-            cout << "Received replication message: " << message << endl;
+            string msg = message;
+            string delimiter = ";";
+            size_t pos = 0;
+            string token;
+            string res[10] = {""}; 
+            int count = 0;
+            while ((pos = msg.find(delimiter)) != string::npos) 
+            {
+                token = msg.substr(0, pos);
+                res[count] = token;
+                msg.erase(0, pos + delimiter.length());
+                count++;
+            }
+            table[0].ip = res[0];
+            table[0].mac = res[1];
+            table[0].port = std::stoi(res[2]);
+            table[1].ip = res[3];
+            table[1].mac = res[4];  
+            table[1].port = std::stoi(res[5]);
+            table[2].ip = res[6];
+            table[2].mac = res[7];
+            table[2].port = std::stoi(res[8]);
         }
     }
 };

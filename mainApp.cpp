@@ -28,9 +28,11 @@ int main(int argc, char *argv[])
         
         thread threadClient(ThreadStartClient);
         thread threadReplicationListen(ThreadReplicationListen);
+        thread clientInterface(ThreadClientInterface);
 
         threadClient.join();
         threadReplicationListen.join();
+        clientInterface.join();
 
     }
 
