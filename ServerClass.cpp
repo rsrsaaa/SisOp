@@ -51,6 +51,7 @@ public:
                 table[i].port = cli_addr.sin_port;
                 table[i].ip = inet_ntoa(cli_addr.sin_addr);
                 table[i].status = "AWAKEN";
+                versaoTabela++;
                 break;
             }
         }
@@ -58,7 +59,8 @@ public:
     }
 
     void SendStatusRequest() {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; i++) 
+        {
             if (table[i].ip != " ") {
                 int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
                 if (sockfd < 0) {
@@ -100,7 +102,8 @@ public:
         }
     }
 
-    void PrintTable() {
+    void PrintTable() 
+    {
         cout << "Name\t\tIP\t\tMAC\t\tStatus\t\tPort" << endl;
         for (int i = 0; i < 3; i++) {
             if (table[i].ip != " ") {
@@ -108,4 +111,98 @@ public:
             }
         }
     }
+
+    void SendReplication()
+    {
+        for (int i = 0; i < 3; i++) 
+        {
+            if (table[i].ip != " ") {
+                int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+                if (sockfd < 0) {
+                    perror("Error opening socket");
+                    continue;
+                }
+
+                struct sockaddr_in dest_addr;
+                memset(&dest_addr, 0, sizeof(dest_addr));
+                dest_addr.sin_family = AF_INET;
+                dest_addr.sin_port = htons(MANAGE_PORT);
+                dest_addr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
+
+                //montar mensagem de replicação
+                if(versaoTabela > versaoEnvio)
+                {
+                    versaoEnvio = versaoTabela;
+                    string status_request;
+                    for(int j = 0; j < 3; j++)
+                    {
+                        status_request.append(table[j].ip);
+                        status_request.append(";");
+                        status_request.append(table[j].mac);
+                        status_request.append(";");
+                        status_request.append(std::to_string(table[j].port));
+                        status_request.append(";");
+                    }
+
+                    n = sendto(sockfd, status_request.c_str(), strlen(status_request.c_str()), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
+                    if (n < 0) {
+                        perror("Error sending replication");
+                        close(sockfd);
+                        continue;
+                    }
+                }
+                
+
+                close(sockfd);
+            }
+        }
+    }
+
+    void sendWOL(const std::string &macAddress, const std::string &broadcastAddress, int port = 9) 
+    {
+        // Create the magic packet
+        unsigned char packet[102];
+        
+        // 6 bytes of 0xFF
+        std::fill_n(packet, 6, 0xFF);
+        
+        // 16 repetitions of the MAC address
+        unsigned char mac[6];
+        sscanf(macAddress.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+            &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+
+        for (int i = 1; i <= 16; ++i) {
+            std::copy(mac, mac + 6, packet + i * 6);
+        }
+        
+        // Create a UDP socket
+        int sock = socket(AF_INET, SOCK_DGRAM, 0);
+        if (sock < 0) {
+            perror("socket");
+            return;
+        }
+
+        // Set socket options to allow broadcast
+        int optval = 1;
+        if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &optval, sizeof(optval)) < 0) {
+            perror("setsockopt");
+            close(sock);
+            return;
+        }
+
+        // Configure the destination address
+        struct sockaddr_in addr;
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        addr.sin_addr.s_addr = inet_addr(broadcastAddress.c_str());
+
+        // Send the magic packet
+        if (sendto(sock, packet, sizeof(packet), 0, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+            perror("sendto");
+        }
+
+        // Close the socket
+        close(sock);
+    }   
 };

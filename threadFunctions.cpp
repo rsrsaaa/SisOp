@@ -28,6 +28,14 @@ void ThreadServerSleepStatus(mutex& mlock)
 
     }
 }
+void ThreadSendReplication() 
+{
+    Server server;
+    while (1) 
+    {
+        server.SendReplication();
+    }
+}
 //SERVER THREADS END
 
 //INTERFACE THREADS BEGIN
@@ -48,4 +56,20 @@ void ThreadInterface(mutex& mlock)
 //INTERFACE THREADS END
 
 //CLIENT THREADS BEGIN
+void ThreadStartClient() 
+{
+    Client client;
+    client.InitClientSocket();
+    client.SendRequestToServer();
+    client.ListenToServer();
+}
+
+void ThreadReplicationListen() 
+{
+    Client client;
+    while (1) 
+    {
+        client.ListenToReplication();
+    }
+}
 //CLIENT THREADS END

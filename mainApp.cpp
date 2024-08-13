@@ -14,19 +14,24 @@ int main(int argc, char *argv[])
             thread threadInterface(ThreadInterface,  ref(mlock));
             thread threadServerDiscover(ThreadServerDiscover,  ref(mlock));
             thread threadServerSleepStatus(ThreadServerSleepStatus,  ref(mlock));
+            thread threadSendReplication(ThreadSendReplication);
 
             threadInterface.join();
             threadServerDiscover.join();
             threadServerSleepStatus.join();
+            threadSendReplication.join();
             
         }
     } 
     else 
     {
-        Client client;
-        client.InitClientSocket();
-        client.SendRequestToServer();
-        client.ListenToServer();
+        
+        thread threadClient(ThreadStartClient);
+        thread threadReplicationListen(ThreadReplicationListen);
+
+        threadClient.join();
+        threadReplicationListen.join();
+
     }
 
     return 0;

@@ -1,21 +1,24 @@
 #include "global.hpp"
 
-class Client {
+class Client 
+{
 public:
-    int clientSocket, clientStatusSocket, n;
+    int clientSocket, clientStatusSocket, clientRepSocket, n;
     sockaddr_in serverAddress;
     int myClientNum = 0;
 
-    void InitClientSocket() {
-        cout << "rodando cliente" << endl;
+    void InitClientSocket() 
+    {
         clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (clientSocket == -1) {
+        if (clientSocket == -1) 
+        {
             cerr << "Failed to create client socket." << endl;
             return;
         }
         
         int broadcastEnable = 1;
-        if (setsockopt(clientSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0) {
+        if (setsockopt(clientSocket, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0) 
+        {
             cerr << "Error setting socket option" << endl;
             return;
         }
@@ -25,11 +28,12 @@ public:
         serverAddress.sin_addr.s_addr = inet_addr("255.255.255.255");
     }
 
-    void SendRequestToServer() {
-        cout << "enviando mensagem para o servidor" << endl;
+    void SendRequestToServer() 
+    {
         char message[] = "sleep discovery service";
         n = sendto(clientSocket, message, strlen(message), 0, (const struct sockaddr *) &serverAddress, sizeof(struct sockaddr_in));
-        if (n < 0) {
+        if (n < 0) 
+        {
             cerr << "Failed to send message to server." << endl;
             return;
         }
@@ -37,14 +41,15 @@ public:
         clientNum++;
     }
 
-    void ListenToServer() {
+    void ListenToServer() 
+    {
         clientStatusSocket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (clientStatusSocket == -1) {
+        if (clientStatusSocket == -1) 
+        {
             cerr << "Failed to create client status socket." << endl;
             return;
         }
 
-        cout << "Listening for server connections on the status port." << endl;
         sockaddr_in statusAddress, serverAddress;
         socklen_t servlen;
         statusAddress.sin_family = AF_INET;
@@ -52,7 +57,8 @@ public:
         statusAddress.sin_addr.s_addr = INADDR_ANY;
         servlen = sizeof(struct sockaddr_in);
 
-        if (bind(clientStatusSocket, (struct sockaddr*)&statusAddress, sizeof(statusAddress)) == -1) {
+        if (bind(clientStatusSocket, (struct sockaddr*)&statusAddress, sizeof(statusAddress)) == -1) 
+        {
             cerr << "Failed to bind status socket." << endl;
             close(clientStatusSocket);
             return;
@@ -61,18 +67,61 @@ public:
         char message[1024];
         unsigned int length;
         length = sizeof(struct sockaddr_in);
-        while(1) {
+        while(1) 
+        {
             n = recvfrom(clientStatusSocket, message, 256, 0, (struct sockaddr *) &serverAddress, &servlen);
-            if (n < 0) {
+            if (n < 0) 
+            {
                 cerr << "ERROR on recvfrom" << endl;
                 continue;
             }
-            cout << "Received a datagram: " << message << endl;
             
             n = sendto(clientStatusSocket, "ack", sizeof("ack"), 0, (struct sockaddr *) &serverAddress, sizeof(struct sockaddr));
-            if (n < 0) {
+            if (n < 0) 
+            {
                 cerr << "ERROR on sendto" << endl;
             }
+        }
+    }
+
+    void ListenToReplication()
+    {
+        clientRepSocket = socket(AF_INET, SOCK_DGRAM, 0);
+        if (clientRepSocket == -1) 
+        {
+            cerr << "Failed to create client replication socket." << endl;
+            close(clientRepSocket);
+            return;
+        }
+
+        sockaddr_in manageAddress, serverAddress;
+        socklen_t servlen;
+        manageAddress.sin_family = AF_INET;
+        manageAddress.sin_port = htons(MANAGE_PORT);
+        manageAddress.sin_addr.s_addr = INADDR_ANY;
+        servlen = sizeof(struct sockaddr_in);
+
+        if (bind(clientRepSocket, (struct sockaddr*)&manageAddress, sizeof(manageAddress)) == -1) 
+        {
+            cerr << "Failed to bind replication socket." << endl;
+            close(clientRepSocket);
+            return;
+        }
+
+        char message[1024];
+        unsigned int length;
+        length = sizeof(struct sockaddr_in);
+        while(1) 
+        {
+            n = recvfrom(clientRepSocket, (void *)message, 1024, 0, (struct sockaddr *) &serverAddress, &servlen);
+            if (n < 0) 
+            {
+                cerr << "ERROR on recvfrom" << endl;
+                continue;
+            }
+            
+            //montar mensagem pra ver como ela será desmontada aqui
+            cout << "Received replication message: " << message << endl;
         }
     }
 };

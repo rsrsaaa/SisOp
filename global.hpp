@@ -17,6 +17,8 @@ using namespace std;
 #define MANAGE_PORT 51000
 #define INTERFACE_PORT 50000
 
+int versaoTabela = 0;
+int versaoEnvio = 0;
 struct managementTable
 {
     string name = " ";
