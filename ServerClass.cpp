@@ -1,56 +1,63 @@
 #include "global.hpp"
 #include "netinet/ip_icmp.h"
 #include <sys/ioctl.h> // Add this line to include the necessary header file
+#include <sys/ioctl.h> // Add this line to include the necessary header file
 
-class Server {
+class Server
+{
 public:
     int newsockfd, n;
     socklen_t clilen;
     struct sockaddr_in serv_addr, cli_addr;
     char buff[256];
 
-    int InitServerSocket() {
+    int InitServerSocket()
+    {
         int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-        if (sockfd < 0) {
+        if (sockfd < 0)
+        {
             perror("Error opening socket");
             exit(1);
         }
         int broadcastEnable = 1;
-        if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0) {
+        if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0)
+        {
             perror("Error setting socket option");
             exit(1);
         }
-        memset((char *) &serv_addr, 0, sizeof(serv_addr));
+        memset((char *)&serv_addr, 0, sizeof(serv_addr));
         serv_addr.sin_family = AF_INET;
         serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
         serv_addr.sin_port = htons(DISCOVER_PORT);
-        if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+        if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+        {
             perror("Error binding socket");
             exit(1);
         }
         return sockfd;
     }
 
-    string ListenToClientDiscover(int sockfd) 
+    string ListenToClientDiscover(int sockfd)
     {
         clilen = sizeof(cli_addr);
         unsigned int length;
         bzero(buff, sizeof(buff));
         length = sizeof(struct sockaddr_in);
-        n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *) &cli_addr, &length);
-        if (n < 0) {
+        n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *)&cli_addr, &length);
+        if (n < 0)
+        {
             perror("Error reading from socket");
             exit(1);
         }
         return buff;
     }
 
-    void AddNewClientToTable() 
+    void AddNewClientToTable()
     {
-        
-        for (int i = 0; i < 3; i++) 
+
+        for (int i = 0; i < 3; i++)
         {
-            if (table[i].ip == " ") 
+            if (table[i].ip == " ")
             {
 
                 table[i].name = inet_ntoa(cli_addr.sin_addr);
@@ -64,12 +71,15 @@ public:
         close(newsockfd);
     }
 
-    void SendStatusRequest() {
-        for (int i = 0; i < 3; i++) 
+    void SendStatusRequest()
+    {
+        for (int i = 0; i < 3; i++)
         {
-            if (table[i].ip != " ") {
+            if (table[i].ip != " ")
+            {
                 int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-                if (sockfd < 0) {
+                if (sockfd < 0)
+                {
                     perror("Error opening socket");
                     continue;
                 }
@@ -81,8 +91,9 @@ public:
                 dest_addr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
 
                 const char *status_request = "sleep status request";
-                n = sendto(sockfd, status_request, strlen(status_request), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
-                if (n < 0) {
+                n = sendto(sockfd, status_request, strlen(status_request), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+                if (n < 0)
+                {
                     perror("Error sending status request");
                     close(sockfd);
                     continue;
@@ -92,14 +103,17 @@ public:
                 struct timeval timeout;
                 timeout.tv_sec = 5;
                 timeout.tv_usec = 0;
-                setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+                setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
 
                 struct sockaddr_in from;
                 socklen_t fromlen = sizeof(from);
-                n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&from, &fromlen);
-                if (n < 0) {
+                n = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&from, &fromlen);
+                if (n < 0)
+                {
                     table[i].status = "ASLEEP";
-                } else {
+                }
+                else
+                {
                     table[i].status = "AWAKEN";
                 }
 
@@ -108,11 +122,13 @@ public:
         }
     }
 
-    void PrintTable() 
+    void PrintTable()
     {
         cout << "Name\t\tIP\t\tMAC\t\tStatus\t\tPort" << endl;
-        for (int i = 0; i < 3; i++) {
-            if (table[i].ip != " ") {
+        for (int i = 0; i < 3; i++)
+        {
+            if (table[i].ip != " ")
+            {
                 cout << table[i].name << "\t" << table[i].ip << "\t" << table[i].mac << "\t\t" << table[i].status << "\t\t" << table[i].port << endl;
             }
         }
@@ -120,27 +136,29 @@ public:
 
     void SendReplication()
     {
-        for (int i = 0; i < 3; i++) 
+        if (versaoTabela > versaoEnvio)
         {
-            if (table[i].ip != " ") {
-                int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-                if (sockfd < 0) {
-                    perror("Error opening socket");
-                    continue;
-                }
-
-                struct sockaddr_in dest_addr;
-                memset(&dest_addr, 0, sizeof(dest_addr));
-                dest_addr.sin_family = AF_INET;
-                dest_addr.sin_port = htons(MANAGE_PORT);
-                dest_addr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
-
-                //montar mensagem de replicação
-                if(versaoTabela > versaoEnvio)
+            for (int i = 0; i < 3; i++)
+            {
+                if (table[i].ip != " ")
                 {
-                    versaoEnvio = versaoTabela;
+                    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+                    if (sockfd < 0)
+                    {
+                        perror("Error opening socket");
+                        continue;
+                    }
+
+                    struct sockaddr_in dest_addr;
+                    memset(&dest_addr, 0, sizeof(dest_addr));
+                    dest_addr.sin_family = AF_INET;
+                    dest_addr.sin_port = htons(MANAGE_PORT);
+                    dest_addr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
+
+                    // montar mensagem de replicação
+
                     string status_request;
-                    for(int j = 0; j < 3; j++)
+                    for (int j = 0; j < 3; j++)
                     {
                         status_request.append(table[j].ip);
                         status_request.append(";");
@@ -150,47 +168,52 @@ public:
                         status_request.append(";");
                     }
 
-                    n = sendto(sockfd, status_request.c_str(), strlen(status_request.c_str()), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
-                    if (n < 0) {
+                    n = sendto(sockfd, status_request.c_str(), strlen(status_request.c_str()), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+                    if (n < 0)
+                    {
                         perror("Error sending replication");
                         close(sockfd);
                         continue;
                     }
-                }
-                
 
-                close(sockfd);
+                    close(sockfd);
+                }
             }
+            versaoEnvio = versaoTabela;
+
         }
     }
 
-    void sendWOL(const std::string &macAddress, const std::string &broadcastAddress, int port = 9) 
+    void sendWOL(const std::string &macAddress, const std::string &broadcastAddress, int port = 9)
     {
         // Create the magic packet
         unsigned char packet[102];
-        
+
         // 6 bytes of 0xFF
         std::fill_n(packet, 6, 0xFF);
-        
+
         // 16 repetitions of the MAC address
         unsigned char mac[6];
         sscanf(macAddress.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-            &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+               &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
 
-        for (int i = 1; i <= 16; ++i) {
+        for (int i = 1; i <= 16; ++i)
+        {
             std::copy(mac, mac + 6, packet + i * 6);
         }
-        
+
         // Create a UDP socket
         int sock = socket(AF_INET, SOCK_DGRAM, 0);
-        if (sock < 0) {
+        if (sock < 0)
+        {
             perror("socket");
             return;
         }
 
         // Set socket options to allow broadcast
         int optval = 1;
-        if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &optval, sizeof(optval)) < 0) {
+        if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &optval, sizeof(optval)) < 0)
+        {
             perror("setsockopt");
             close(sock);
             return;
@@ -204,11 +227,12 @@ public:
         addr.sin_addr.s_addr = inet_addr(broadcastAddress.c_str());
 
         // Send the magic packet
-        if (sendto(sock, packet, sizeof(packet), 0, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        if (sendto(sock, packet, sizeof(packet), 0, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+        {
             perror("sendto");
         }
 
         // Close the socket
         close(sock);
-    }   
+    }
 };
