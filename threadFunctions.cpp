@@ -69,6 +69,7 @@ void ThreadReplicationListen()
     Client client;
     while (1) 
     {
+
         client.ListenToReplication();
     }
 }
@@ -81,6 +82,7 @@ void ThreadClientInterface()
     {
         clearscreen();
         client.PrintTable();
+        sleep(5);
 
     }
 }

@@ -1,5 +1,6 @@
 #include "global.hpp"
 #include "netinet/ip_icmp.h"
+#include <sys/ioctl.h> // Add this line to include the necessary header file
 
 class Server {
 public:
@@ -30,7 +31,8 @@ public:
         return sockfd;
     }
 
-    string ListenToClientDiscover(int sockfd) {
+    string ListenToClientDiscover(int sockfd) 
+    {
         clilen = sizeof(cli_addr);
         unsigned int length;
         bzero(buff, sizeof(buff));
@@ -43,10 +45,14 @@ public:
         return buff;
     }
 
-    void AddNewClientToTable() {
-        for (int i = 0; i < 3; i++) {
-            if (table[i].ip == " ") {
-                table[i].mac = reinterpret_cast<const char*>(cli_addr.sin_zero);
+    void AddNewClientToTable() 
+    {
+        
+        for (int i = 0; i < 3; i++) 
+        {
+            if (table[i].ip == " ") 
+            {
+
                 table[i].name = inet_ntoa(cli_addr.sin_addr);
                 table[i].port = cli_addr.sin_port;
                 table[i].ip = inet_ntoa(cli_addr.sin_addr);
