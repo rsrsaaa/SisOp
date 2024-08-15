@@ -3,15 +3,12 @@
 int main(int argc, char *argv[])
 {
     mutex mlock;
-    pthread_attr_t attr;
-    void *res;
-    int ret;
 
     if (argc > 1) {
         if (strcmp(argv[1], "manager") == 0) 
         {
 
-            thread threadInterface(ThreadInterface,  ref(mlock));
+            thread threadInterface(ThreadInterface);
             thread threadServerDiscover(ThreadServerDiscover,  ref(mlock));
             thread threadServerSleepStatus(ThreadServerSleepStatus,  ref(mlock));
             thread threadSendReplication(ThreadSendReplication);

@@ -6,6 +6,7 @@ public:
     int clientSocket, clientStatusSocket, clientRepSocket, n;
     sockaddr_in serverAddress;
     int myClientNum = 0;
+    string myMAC = " ";
 
     void InitClientSocket() 
     {
@@ -30,6 +31,7 @@ public:
 
     void SendRequestToServer() 
     {
+        //fazer o cliente mandar o mac por aqui, talvez criando um pacote de mensagem pra enviar o mac junto com a requisição do sleep service
         char message[] = "sleep discovery service";
         n = sendto(clientSocket, message, strlen(message), 0, (const struct sockaddr *) &serverAddress, sizeof(struct sockaddr_in));
         if (n < 0) 
@@ -65,8 +67,6 @@ public:
         }
 
         char message[1024];
-        unsigned int length;
-        length = sizeof(struct sockaddr_in);
         while(1) 
         {
             n = recvfrom(clientStatusSocket, message, 256, 0, (struct sockaddr *) &serverAddress, &servlen);
@@ -109,8 +109,6 @@ public:
         }
 
         char message[1024];
-        unsigned int length;
-        length = sizeof(struct sockaddr_in);
         while(1) 
         {
             n = recvfrom(clientRepSocket, (void *)message, 1024, 0, (struct sockaddr *) &serverAddress, &servlen);
@@ -147,5 +145,54 @@ public:
             table[2].mac = res[7];
             table[2].port = std::stoi(res[8]);
         }
+    }
+
+
+    string getMAC()
+    {
+        struct ifreq ifr;
+        struct ifconf ifc;
+        char buf[1024];
+        int success = 0;
+
+        int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+        if (sock == -1)
+        { /* handle error*/
+        };
+
+        ifc.ifc_len = sizeof(buf);
+        ifc.ifc_buf = buf;
+        if (ioctl(sock, SIOCGIFCONF, &ifc) == -1)
+        { /* handle error */
+        }
+
+        struct ifreq *it = ifc.ifc_req;
+        const struct ifreq *const end = it + (ifc.ifc_len / sizeof(struct ifreq));
+
+        for (; it != end; ++it)
+        {
+            strcpy(ifr.ifr_name, it->ifr_name);
+            if (ioctl(sock, SIOCGIFFLAGS, &ifr) == 0)
+            {
+                if (!(ifr.ifr_flags & IFF_LOOPBACK))
+                { // don't count loopback
+                    if (ioctl(sock, SIOCGIFHWADDR, &ifr) == 0)
+                    {
+                        success = 1;
+                        break;
+                    }
+                }
+            }
+            else
+            { /* handle error */
+            }
+        }
+
+        unsigned char mac_address[6];
+
+        if (success)
+            memcpy(mac_address, ifr.ifr_hwaddr.sa_data, 6);
+
+        return to_string(mac_address[0]) + ":" + to_string(mac_address[1]) + ":" + to_string(mac_address[2]) + ":" + to_string(mac_address[3]) + ":" + to_string(mac_address[4]) + ":" + to_string(mac_address[5]);
     }
 };

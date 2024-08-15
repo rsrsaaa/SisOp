@@ -39,17 +39,15 @@ void ThreadSendReplication()
 //SERVER THREADS END
 
 //INTERFACE THREADS BEGIN
-void ThreadInterface(mutex& mlock) 
+void ThreadInterface() 
 {
     Server server;
     
-    int option = 0;
+    //int option = 0;
     while (1) 
     {
         clearscreen();
-
         server.PrintTable();
-        
         sleep(1);
     }
 }
@@ -77,7 +75,7 @@ void ThreadReplicationListen()
 void ThreadClientInterface() 
 {
     Server client;
-    int option = 0;
+    //int option = 0;
     while (1) 
     {
         clearscreen();

@@ -1,7 +1,4 @@
 #include "global.hpp"
-#include "netinet/ip_icmp.h"
-#include <sys/ioctl.h> // Add this line to include the necessary header file
-#include <sys/ioctl.h> // Add this line to include the necessary header file
 
 class Server
 {
@@ -125,7 +122,7 @@ public:
 
     void PrintTable()
     {
-        cout << "Name\t\tIP\t\tMAC\t\tStatus\t\tPort" << endl;
+        cout << "Name\t\tIP\t\tMAC\t\t\t\tStatus\t\tPort" << endl;
         for (int i = 0; i < 3; i++)
         {
             if (table[i].ip != " ")
@@ -137,56 +134,52 @@ public:
 
     void SendReplication()
     {
-            string repTable;
-            for (int j = 0; j < 3; j++)
+        string repTable;
+        for (int j = 0; j < 3; j++)
+        {
+            repTable.append(table[j].ip);
+            repTable.append(";");
+            repTable.append(table[j].mac);
+            repTable.append(";");
+            repTable.append(std::to_string(table[j].port));
+            repTable.append(";");
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            if (table[i].ip != " ")
             {
-                repTable.append(table[j].ip);
-                repTable.append(";");
-                repTable.append(table[j].mac);
-                repTable.append(";");
-                repTable.append(std::to_string(table[j].port));
-                repTable.append(";");
-            }
-            
-            for (int i = 0; i < 3; i++)
-            {
-                if (table[i].ip != " ")
+                int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+                if (sockfd < 0)
                 {
-                    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-                    if (sockfd < 0)
+                    perror("Error opening socket");
+                    continue;
+                }
+
+                struct sockaddr_in dest_addr;
+                memset(&dest_addr, 0, sizeof(dest_addr));
+                dest_addr.sin_family = AF_INET;
+                dest_addr.sin_port = htons(MANAGE_PORT);
+                dest_addr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
+
+                // montar mensagem de replicação
+
+                if (versaoTabela > table[i].versaoTabela && table[i].ip != " ")
+                {
+                    table[i].versaoTabela = versaoTabela;
+
+                    cout << "rep";
+                    n = sendto(sockfd, repTable.c_str(), strlen(repTable.c_str()), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+                    if (n < 0)
                     {
-                        perror("Error opening socket");
+                        perror("Error sending replication");
+                        close(sockfd);
                         continue;
                     }
-
-                    struct sockaddr_in dest_addr;
-                    memset(&dest_addr, 0, sizeof(dest_addr));
-                    dest_addr.sin_family = AF_INET;
-                    dest_addr.sin_port = htons(MANAGE_PORT);
-                    dest_addr.sin_addr.s_addr = inet_addr(table[i].ip.c_str());
-
-                    // montar mensagem de replicação
-
-                    
-                    if (versaoTabela > table[i].versaoTabela && table[i].ip != " ")
-                    {
-                        table[i].versaoTabela = versaoTabela;
-                        
-                        cout<<"rep";
-                        n = sendto(sockfd, repTable.c_str(), strlen(repTable.c_str()), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-                        if (n < 0)
-                        {
-                            perror("Error sending replication");
-                            close(sockfd);
-                            continue;
-                        }
-                    }
-                    close(sockfd);
                 }
+                close(sockfd);
             }
-            
-
-        
+        }
     }
 
     void sendWOL(const std::string &macAddress, const std::string &broadcastAddress, int port = 9)
@@ -240,4 +233,6 @@ public:
         // Close the socket
         close(sock);
     }
+
+    
 };

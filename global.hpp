@@ -10,6 +10,10 @@
 #include <sys/types.h>
 #include <mutex>
 #include <thread>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include "netinet/ip_icmp.h"
+
 
 using namespace std;
 #define DISCOVER_PORT 53000
