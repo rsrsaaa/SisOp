@@ -18,7 +18,6 @@ using namespace std;
 #define INTERFACE_PORT 50000
 
 int versaoTabela = 0;
-int versaoEnvio = 0;
 struct managementTable
 {
     string name = " ";
@@ -26,6 +25,7 @@ struct managementTable
     string mac = " ";
     string status = " ";
     int port = 0;
+    int versaoTabela = 0;
 };
 managementTable table[3];
 int clientNum = 0;

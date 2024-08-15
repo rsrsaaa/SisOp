@@ -64,6 +64,7 @@ public:
                 table[i].port = cli_addr.sin_port;
                 table[i].ip = inet_ntoa(cli_addr.sin_addr);
                 table[i].status = "AWAKEN";
+                sleep(1);
                 versaoTabela++;
                 break;
             }
@@ -136,8 +137,17 @@ public:
 
     void SendReplication()
     {
-        if (versaoTabela > versaoEnvio)
-        {
+            string repTable;
+            for (int j = 0; j < 3; j++)
+            {
+                repTable.append(table[j].ip);
+                repTable.append(";");
+                repTable.append(table[j].mac);
+                repTable.append(";");
+                repTable.append(std::to_string(table[j].port));
+                repTable.append(";");
+            }
+            
             for (int i = 0; i < 3; i++)
             {
                 if (table[i].ip != " ")
@@ -157,31 +167,26 @@ public:
 
                     // montar mensagem de replicação
 
-                    string status_request;
-                    for (int j = 0; j < 3; j++)
+                    
+                    if (versaoTabela > table[i].versaoTabela && table[i].ip != " ")
                     {
-                        status_request.append(table[j].ip);
-                        status_request.append(";");
-                        status_request.append(table[j].mac);
-                        status_request.append(";");
-                        status_request.append(std::to_string(table[j].port));
-                        status_request.append(";");
+                        table[i].versaoTabela = versaoTabela;
+                        
+                        cout<<"rep";
+                        n = sendto(sockfd, repTable.c_str(), strlen(repTable.c_str()), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+                        if (n < 0)
+                        {
+                            perror("Error sending replication");
+                            close(sockfd);
+                            continue;
+                        }
                     }
-
-                    n = sendto(sockfd, status_request.c_str(), strlen(status_request.c_str()), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-                    if (n < 0)
-                    {
-                        perror("Error sending replication");
-                        close(sockfd);
-                        continue;
-                    }
-
                     close(sockfd);
                 }
             }
-            versaoEnvio = versaoTabela;
+            
 
-        }
+        
     }
 
     void sendWOL(const std::string &macAddress, const std::string &broadcastAddress, int port = 9)
