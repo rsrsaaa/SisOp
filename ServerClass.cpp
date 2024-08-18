@@ -1,4 +1,4 @@
-//ServerClass.cpp
+// ServerClass.cpp
 #include "global.hpp"
 
 class Server
@@ -47,21 +47,29 @@ public:
             perror("Error reading from socket");
             exit(1);
         }
-        return buff;
+
+        std::string received_message(buff);
+        size_t delimiter_pos = received_message.find(';');
+
+        std::string mac_address = received_message.substr(delimiter_pos + 1);
+
+        // Armazena o endereço MAC em uma variável temporária
+        current_mac = mac_address;
+
+        return received_message.substr(0, delimiter_pos); // Retorna apenas a parte da mensagem sem o MAC
     }
 
     void AddNewClientToTable()
     {
-
         for (int i = 0; i < 3; i++)
         {
             if (table[i].ip == " ")
             {
-
                 table[i].name = inet_ntoa(cli_addr.sin_addr);
                 table[i].port = cli_addr.sin_port;
                 table[i].ip = inet_ntoa(cli_addr.sin_addr);
                 table[i].status = "AWAKEN";
+                table[i].mac = current_mac; // Armazena o endereço MAC na tabela
                 sleep(1);
                 versaoTabela++;
                 break;
@@ -185,55 +193,57 @@ public:
         }
     }
 
-    void sendWOL(const std::string &macAddress, const std::string &broadcastAddress, int port = 9)
+    void sendWakeOnLanPacket(const std::string &macAddress)
     {
-        // Create the magic packet
         unsigned char packet[102];
+        int packetIndex = 0;
 
-        // 6 bytes of 0xFF
-        std::fill_n(packet, 6, 0xFF);
-
-        // 16 repetitions of the MAC address
-        unsigned char mac[6];
-        sscanf(macAddress.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-               &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
-
-        for (int i = 1; i <= 16; ++i)
+        // Preenche com 6 bytes de 0xFF
+        for (int i = 0; i < 6; ++i)
         {
-            std::copy(mac, mac + 6, packet + i * 6);
+            packet[packetIndex++] = 0xFF;
         }
 
-        // Create a UDP socket
-        int sock = socket(AF_INET, SOCK_DGRAM, 0);
-        if (sock < 0)
+        // Converte o endereço MAC para bytes e repete 16 vezes
+        unsigned int mac[6];
+        sscanf(macAddress.c_str(), "%02x:%02x:%02x:%02x:%02x:%02x", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+
+        for (int i = 0; i < 16; ++i)
         {
-            perror("socket");
+            for (int j = 0; j < 6; ++j)
+            {
+                packet[packetIndex++] = static_cast<unsigned char>(mac[j]);
+            }
+        }
+
+        // Configuração do socket de transmissão
+        int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (sockfd < 0)
+        {
+            perror("Error creating socket");
             return;
         }
 
-        // Set socket options to allow broadcast
-        int optval = 1;
-        if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &optval, sizeof(optval)) < 0)
+        int broadcastEnable = 1;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0)
         {
-            perror("setsockopt");
-            close(sock);
+            perror("Error setting broadcast option");
+            close(sockfd);
             return;
         }
 
-        // Configure the destination address
-        struct sockaddr_in addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(port);
-        addr.sin_addr.s_addr = inet_addr(broadcastAddress.c_str());
+        sockaddr_in destAddr;
+        memset(&destAddr, 0, sizeof(destAddr));
+        destAddr.sin_family = AF_INET;
+        destAddr.sin_port = htons(9);                            // Porta padrão para WoL
+        destAddr.sin_addr.s_addr = inet_addr("255.255.255.255"); // Envia para todos os dispositivos na rede
 
-        // Send the magic packet
-        if (sendto(sock, packet, sizeof(packet), 0, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+        // Envia o pacote WoL
+        if (sendto(sockfd, packet, sizeof(packet), 0, (sockaddr *)&destAddr, sizeof(destAddr)) < 0)
         {
-            perror("sendto");
+            perror("Error sending WakeOnLan packet");
         }
 
-        // Close the socket
-        close(sock);
+        close(sockfd);
     }
 };

@@ -1,4 +1,4 @@
-//ClientClass.cpp
+// ClientClass.cpp
 #include "global.hpp"
 
 class Client
@@ -7,7 +7,7 @@ public:
     int clientSocket, clientStatusSocket, clientRepSocket, n;
     sockaddr_in serverAddress;
     int myClientNum = 0;
-    string myMAC = " ";
+    string myMAC = getMAC();
 
     void InitClientSocket()
     {
@@ -33,8 +33,8 @@ public:
     void SendRequestToServer()
     {
         // fazer o cliente mandar o mac por aqui, talvez criando um pacote de mensagem pra enviar o mac junto com a requisição do sleep service
-        char message[] = "sleep discovery service";
-        n = sendto(clientSocket, message, strlen(message), 0, (const struct sockaddr *)&serverAddress, sizeof(struct sockaddr_in));
+        std::string message = "sleep discovery service;" + myMAC;
+        n = sendto(clientSocket, message.c_str(), message.size(), 0, (const struct sockaddr *)&serverAddress, sizeof(struct sockaddr_in));
         if (n < 0)
         {
             cerr << "Failed to send message to server." << endl;
@@ -151,7 +151,7 @@ public:
         }
     }
 
-    string getMAC()
+    std::string getMAC()
     {
         struct ifreq ifr;
         struct ifconf ifc;
@@ -160,13 +160,18 @@ public:
 
         int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
         if (sock == -1)
-        { /* handle error*/
-        };
+        {
+            // Handle error
+            return "";
+        }
 
         ifc.ifc_len = sizeof(buf);
         ifc.ifc_buf = buf;
         if (ioctl(sock, SIOCGIFCONF, &ifc) == -1)
-        { /* handle error */
+        {
+            // Handle error
+            close(sock);
+            return "";
         }
 
         struct ifreq *it = ifc.ifc_req;
@@ -178,7 +183,7 @@ public:
             if (ioctl(sock, SIOCGIFFLAGS, &ifr) == 0)
             {
                 if (!(ifr.ifr_flags & IFF_LOOPBACK))
-                { // don't count loopback
+                { // Don't count loopback
                     if (ioctl(sock, SIOCGIFHWADDR, &ifr) == 0)
                     {
                         success = 1;
@@ -187,15 +192,36 @@ public:
                 }
             }
             else
-            { /* handle error */
+            {
+                // Handle error
+                close(sock);
+                return "";
             }
         }
 
         unsigned char mac_address[6];
 
         if (success)
+        {
             memcpy(mac_address, ifr.ifr_hwaddr.sa_data, 6);
+        }
+        else
+        {
+            close(sock);
+            return "";
+        }
 
-        return to_string(mac_address[0]) + ":" + to_string(mac_address[1]) + ":" + to_string(mac_address[2]) + ":" + to_string(mac_address[3]) + ":" + to_string(mac_address[4]) + ":" + to_string(mac_address[5]);
+        close(sock);
+
+        std::ostringstream mac_stream;
+        mac_stream << std::hex << std::setfill('0');
+        for (int i = 0; i < 6; ++i)
+        {
+            mac_stream << std::setw(2) << static_cast<int>(mac_address[i]);
+            if (i != 5)
+                mac_stream << ":";
+        }
+
+        return mac_stream.str();
     }
 };

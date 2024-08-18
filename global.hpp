@@ -14,6 +14,9 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include "netinet/ip_icmp.h"
+#include <sstream>
+#include <iomanip>
+#include <cstring>
 
 
 using namespace std;
@@ -22,6 +25,7 @@ using namespace std;
 #define MANAGE_PORT 51000
 #define INTERFACE_PORT 50000
 
+std::string current_mac;
 int versaoTabela = 0;
 struct managementTable
 {
