@@ -1,3 +1,4 @@
+//ServerClass.cpp
 #include "global.hpp"
 
 class Server
@@ -141,6 +142,8 @@ public:
             repTable.append(";");
             repTable.append(table[j].mac);
             repTable.append(";");
+            repTable.append(table[j].status);
+            repTable.append(";");
             repTable.append(std::to_string(table[j].port));
             repTable.append(";");
         }
@@ -233,6 +236,4 @@ public:
         // Close the socket
         close(sock);
     }
-
-    
 };
