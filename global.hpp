@@ -1,4 +1,4 @@
-//global.hpp
+// global.hpp
 #pragma once
 #include <iostream>
 #include <sys/socket.h>
@@ -17,7 +17,12 @@
 #include <sstream>
 #include <iomanip>
 #include <cstring>
-
+#include <cstdlib>
+#include <pthread.h>
+#include <atomic>
+#include <condition_variable>
+#include <chrono>
+#include <termios.h>
 
 using namespace std;
 #define DISCOVER_PORT 53000
@@ -26,6 +31,8 @@ using namespace std;
 #define INTERFACE_PORT 50000
 
 std::string current_mac;
+//std::atomic<bool> user_input(false); // Flag para verificar se o usuário está digitando
+
 int versaoTabela = 0;
 struct managementTable
 {
@@ -36,6 +43,7 @@ struct managementTable
     int port = 0;
     int versaoTabela = 0;
 };
+
 managementTable table[3];
 int clientNum = 0;
 void clearscreen()
