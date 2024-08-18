@@ -5,8 +5,7 @@
 
 // extern std::atomic<bool> user_input; // Usar atomic para garantir a sincronização
 std::mutex mtx;
-bool user_input = false;      // Flag para verificar se o usuário está digitando
-bool input_processed = false; // Flag para saber se o comando foi processado
+std::atomic<bool> user_input(false); // Flag para verificar se o usuário está digitando
 std::condition_variable cv;
 
 // SERVER THREADS BEGIN
@@ -46,19 +45,22 @@ void ThreadSendReplication()
 // SERVER THREADS END
 
 // INTERFACE THREADS BEGIN
+// Função para atualizar a interface e tabela
 void ThreadInterface()
 {
-    Server server;  // Cria uma instância do Server
+    Server server; // Cria uma instância do Server
 
-    std::thread input_thread([&server]() {
+    // Thread para capturar entrada do usuário
+    std::thread input_thread([&server]()
+                             {
+        std::string command;
         while (true)
         {
-            std::string command;
-            std::getline(std::cin, command);
+            std::getline(std::cin, command); // Lê a entrada do usuário
 
             if (!command.empty())
             {
-                user_input = true;
+                user_input = true; // Indica que o usuário está digitando
 
                 // Remove espaços em branco do início e do final do comando
                 command.erase(0, command.find_first_not_of(' '));
@@ -72,26 +74,33 @@ void ThreadInterface()
                     server.sendWakeOnLanPacket(macAddress);                 // Chama a função da instância 'server'
                 }
 
-                user_input = false;
+                user_input = false; // Comando processado, usuário não está mais digitando
             }
-        }
-    });
+        } });
 
     input_thread.detach(); // Desconecta a thread de entrada
 
     while (true)
     {
-        if (!user_input)
-        { // Só atualiza a tabela se o usuário não estiver digitando
-            std::lock_guard<std::mutex> lock(mtx);
+        std::unique_lock<std::mutex> lock(mtx);
+
+        if (!user_input) // Só atualiza a tabela se o usuário não estiver digitando
+        {
             clearscreen();
             server.PrintTable();
             std::cout << "\nserver$: "; // Prompt de comando visível para o usuário
+            std::cout.flush();          // Garante que o prompt seja exibido imediatamente
         }
-         std::this_thread::sleep_for(std::chrono::seconds(1)); // Aguarda 1 segundo antes de atualizar a tabela novamente
+        else
+        {
+            // Se o usuário está digitando, só atualize o prompt
+            std::cout << "\rserver$: " << std::flush; // Mantém o prompt na mesma linha
+        }
+
+        lock.unlock();                                        // Libera o mutex para outras operações
+        std::this_thread::sleep_for(std::chrono::seconds(1)); // Aguarda 1 segundo antes de atualizar a tabela novamente
     }
 }
-
 // INTERFACE THREADS END
 
 // CLIENT THREADS BEGIN
