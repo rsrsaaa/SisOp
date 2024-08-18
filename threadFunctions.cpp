@@ -86,6 +86,7 @@ void ThreadInterface()
             std::lock_guard<std::mutex> lock(mtx);
             clearscreen();
             server.PrintTable();
+            std::cout << "\nserver$: "; // Prompt de comando visível para o usuário
         }
          std::this_thread::sleep_for(std::chrono::seconds(1)); // Aguarda 1 segundo antes de atualizar a tabela novamente
     }
