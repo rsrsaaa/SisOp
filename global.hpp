@@ -35,6 +35,7 @@ std::string current_mac;
 //std::atomic<bool> user_input(false); // Flag para verificar se o usuário está digitando
 
 int versaoTabela = 0;
+bool temLider = false;
 struct managementTable
 {
     string name = " ";
