@@ -31,18 +31,49 @@ public:
     }
 
     void SendRequestToServer()
+{
+    // Monta a mensagem de descoberta de serviço, incluindo o MAC do cliente
+    std::string message = "sleep discovery service;" + myMAC;
+    
+    // Envia a mensagem de descoberta para o endereço de broadcast
+    n = sendto(clientSocket, message.c_str(), message.size(), 0, (const struct sockaddr *)&serverAddress, sizeof(struct sockaddr_in));
+    if (n < 0)
     {
-        // fazer o cliente mandar o mac por aqui, talvez criando um pacote de mensagem pra enviar o mac junto com a requisição do sleep service
-        std::string message = "sleep discovery service;" + myMAC;
-        n = sendto(clientSocket, message.c_str(), message.size(), 0, (const struct sockaddr *)&serverAddress, sizeof(struct sockaddr_in));
-        if (n < 0)
-        {
-            cerr << "Failed to send message to server." << endl;
-            return;
-        }
+        cerr << "Failed to send message to server." << endl;
+        return;
+    }
+
+    // Recebe a resposta do servidor
+    char buffer[1024];
+    struct timeval timeout;
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+    setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
+
+    sockaddr_in fromAddress;
+    socklen_t fromLen = sizeof(fromAddress);
+    n = recvfrom(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr *)&fromAddress, &fromLen);
+    if (n < 0)
+    {
+        cerr << "Failed to receive response from server." << endl;
+        temLider = false;
+        return;
+    }
+
+    else
+    {
+        temLider = true;
+        buffer[n] = '\0';  // Null-terminate the received string
+        std::string response(buffer);
+        std::cout << "Received response from server: " << response << std::endl;
+
         myClientNum = clientNum;
         clientNum++;
     }
+    
+    close(clientSocket);
+
+}
 
     void ListenToServer()
     {
@@ -68,7 +99,7 @@ public:
         }
 
         char message[1024];
-        while (1)
+        while (temLider)
         {
             n = recvfrom(clientStatusSocket, message, 256, 0, (struct sockaddr *)&serverAddress, &servlen);
             if (n < 0)
@@ -110,7 +141,7 @@ public:
         }
 
         char message[1024];
-        while (1)
+        while (temLider)
         {
             n = recvfrom(clientRepSocket, (void *)message, 1024, 0, (struct sockaddr *)&serverAddress, &servlen);
             if (n < 0)
