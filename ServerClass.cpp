@@ -43,27 +43,35 @@ public:
 
     string ListenToClientDiscover(int sockfd)
     {
-        clilen = sizeof(cli_addr);
-        unsigned int length;
-        bzero(buff, sizeof(buff));
-        length = sizeof(struct sockaddr_in);
-        n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *)&cli_addr, &length);
-        if (n < 0)
-        {
-            perror("Error reading from socket");
-            exit(1);
-        }
-
-        std::string received_message(buff);
-        size_t delimiter_pos = received_message.find(';');
-
-        std::string mac_address = received_message.substr(delimiter_pos + 1);
-
-        // Armazena o endereço MAC em uma variável temporária
-        current_mac = mac_address;
-
-        return received_message.substr(0, delimiter_pos); // Retorna apenas a parte da mensagem sem o MAC
+    clilen = sizeof(cli_addr);
+    unsigned int length;
+    bzero(buff, sizeof(buff));
+    length = sizeof(struct sockaddr_in);
+    n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *)&cli_addr, &length);
+    if (n < 0)
+    {
+        perror("Error reading from socket");
+        exit(1);
     }
+
+    std::string received_message(buff);
+    size_t delimiter_pos = received_message.find(';');
+    std::string mac_address = received_message.substr(delimiter_pos + 1);
+
+    // Armazena o endereço MAC em uma variável temporária
+    current_mac = mac_address;
+
+    // Enviar uma resposta ao cliente
+    const char *response = "ok";
+    n = sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&cli_addr, sizeof(cli_addr));
+    if (n < 0)
+    {
+        perror("Error sending response to client");
+    }
+
+    return received_message.substr(0, delimiter_pos); // Retorna apenas a parte da mensagem sem o MAC
+}
+
 
     void AddNewClientToTable()
     {
