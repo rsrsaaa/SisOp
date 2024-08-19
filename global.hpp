@@ -29,6 +29,7 @@ using namespace std;
 #define STATUS_PORT 52000
 #define MANAGE_PORT 51000
 #define INTERFACE_PORT 50000
+#define TABLE_SIZE 4
 
 std::string current_mac;
 //std::atomic<bool> user_input(false); // Flag para verificar se o usuário está digitando
@@ -41,10 +42,11 @@ struct managementTable
     string mac = " ";
     string status = " ";
     int port = 0;
+    bool isLeader = false;
     int versaoTabela = 0;
 };
-
-managementTable table[3];
+string currentIP; 
+managementTable table[TABLE_SIZE];
 int clientNum = 0;
 void clearscreen()
 {
@@ -71,3 +73,77 @@ void clearscreen()
         perror(msg);        \
         exit(EXIT_FAILURE); \
     } while (0)
+
+std::string getMAC()
+    {
+        struct ifreq ifr;
+        struct ifconf ifc;
+        char buf[1024];
+        int success = 0;
+
+        int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+        if (sock == -1)
+        {
+            // Handle error
+            return "";
+        }
+
+        ifc.ifc_len = sizeof(buf);
+        ifc.ifc_buf = buf;
+        if (ioctl(sock, SIOCGIFCONF, &ifc) == -1)
+        {
+            // Handle error
+            close(sock);
+            return "";
+        }
+
+        struct ifreq *it = ifc.ifc_req;
+        const struct ifreq *const end = it + (ifc.ifc_len / sizeof(struct ifreq));
+
+        for (; it != end; ++it)
+        {
+            strcpy(ifr.ifr_name, it->ifr_name);
+            if (ioctl(sock, SIOCGIFFLAGS, &ifr) == 0)
+            {
+                if (!(ifr.ifr_flags & IFF_LOOPBACK))
+                { // Don't count loopback
+                    if (ioctl(sock, SIOCGIFHWADDR, &ifr) == 0)
+                    {
+                        success = 1;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // Handle error
+                close(sock);
+                return "";
+            }
+        }
+
+        unsigned char mac_address[6];
+
+        if (success)
+        {
+            memcpy(mac_address, ifr.ifr_hwaddr.sa_data, 6);
+        }
+        else
+        {
+            close(sock);
+            return "";
+        }
+
+        close(sock);
+
+        std::ostringstream mac_stream;
+        mac_stream << std::hex << std::setfill('0');
+        for (int i = 0; i < 6; ++i)
+        {
+            mac_stream << std::setw(2) << static_cast<int>(mac_address[i]);
+            if (i != 5)
+                mac_stream << ":";
+        }
+
+        return mac_stream.str();
+    }

@@ -8,6 +8,7 @@ public:
     socklen_t clilen;
     struct sockaddr_in serv_addr, cli_addr;
     char buff[256];
+    string myMAC = getMAC();
 
     int InitServerSocket()
     {
@@ -32,6 +33,11 @@ public:
             perror("Error binding socket");
             exit(1);
         }
+        currentIP = "xxx.xxx.xxx.xxx";
+        table[0].ip = "xxx.xxx.xxx.xxx";
+        table[0].name = "xxx.xxx.xxx.xxx";
+        table[0].mac = myMAC;
+        table[0].isLeader = true;
         return sockfd;
     }
 
@@ -61,7 +67,7 @@ public:
 
     void AddNewClientToTable()
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < TABLE_SIZE; i++)
         {
             if (table[i].ip == " ")
             {
@@ -69,7 +75,8 @@ public:
                 table[i].port = cli_addr.sin_port;
                 table[i].ip = inet_ntoa(cli_addr.sin_addr);
                 table[i].status = "AWAKEN";
-                table[i].mac = current_mac; // Armazena o endereço MAC na tabela
+                table[i].mac = current_mac;
+                table[i].isLeader = false;
                 sleep(1);
                 versaoTabela++;
                 break;
@@ -80,9 +87,9 @@ public:
 
     void SendStatusRequest()
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < TABLE_SIZE; i++)
         {
-            if (table[i].ip != " ")
+            if (table[i].ip != " " && table[i].ip != currentIP)
             {
                 int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
                 if (sockfd < 0)
@@ -131,12 +138,12 @@ public:
 
     void PrintTable()
     {
-        cout << "Name\t\tIP\t\tMAC\t\t\t\tStatus\t\tPort" << endl;
-        for (int i = 0; i < 3; i++)
+        cout << "Name\t\tIP\t\tMAC\t\t\t\tStatus\t\tPort\t\tLeader" << endl;
+        for (int i = 0; i < TABLE_SIZE; i++)
         {
             if (table[i].ip != " ")
             {
-                cout << table[i].name << "\t" << table[i].ip << "\t" << table[i].mac << "\t\t" << table[i].status << "\t\t" << table[i].port << endl;
+                cout << table[i].name << "\t" << table[i].ip << "\t" << table[i].mac << "\t\t" << table[i].status << "\t\t" << table[i].port << "\t\t" << table[i].isLeader << endl;
             }
         }
     }
@@ -144,7 +151,7 @@ public:
     void SendReplication()
     {
         string repTable;
-        for (int j = 0; j < 3; j++)
+        for (int j = 0; j < TABLE_SIZE; j++)
         {
             repTable.append(table[j].ip);
             repTable.append(";");
@@ -154,11 +161,13 @@ public:
             repTable.append(";");
             repTable.append(std::to_string(table[j].port));
             repTable.append(";");
+            repTable.append(std::to_string(table[j].isLeader));
+            repTable.append(";");
         }
 
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < TABLE_SIZE; i++)
         {
-            if (table[i].ip != " ")
+            if (table[i].ip != " " && table[i].ip != currentIP)
             {
                 int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
                 if (sockfd < 0)

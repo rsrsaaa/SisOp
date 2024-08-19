@@ -123,7 +123,7 @@ public:
             string delimiter = ";";
             size_t pos = 0;
             string token;
-            string res[12] = {""};
+            string res[20] = {""};
             int count = 0;
             while ((pos = msg.find(delimiter)) != string::npos)
             {
@@ -138,90 +138,26 @@ public:
             table[0].mac = res[1];
             table[0].status = res[2];
             table[0].port = std::stoi(res[3]);
-            table[1].ip = res[4];
-            table[1].name = res[4];
-            table[1].mac = res[5];
-            table[1].status = res[6];
-            table[1].port = std::stoi(res[7]);
-            table[2].ip = res[8];
-            table[2].name = res[8];
-            table[2].mac = res[9];
-            table[2].status = res[10];
-            table[2].port = std::stoi(res[11]);
+            table[0].isLeader = std::stoi(res[4]);
+            table[1].ip = res[5];
+            table[1].name = res[5];
+            table[1].mac = res[6];
+            table[1].status = res[7];
+            table[1].port = std::stoi(res[8]);
+            table[1].isLeader = std::stoi(res[9]);
+            table[2].ip = res[10];
+            table[2].name = res[10];
+            table[2].mac = res[11];
+            table[2].status = res[12];
+            table[2].port = std::stoi(res[13]);
+            table[2].isLeader = std::stoi(res[14]);
+            table[3].ip = res[15];
+            table[3].name = res[15];
+            table[3].mac = res[16];
+            table[3].status = res[17];
+            table[3].port = std::stoi(res[18]);
+            table[3].isLeader = std::stoi(res[19]);
         }
     }
 
-    std::string getMAC()
-    {
-        struct ifreq ifr;
-        struct ifconf ifc;
-        char buf[1024];
-        int success = 0;
-
-        int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-        if (sock == -1)
-        {
-            // Handle error
-            return "";
-        }
-
-        ifc.ifc_len = sizeof(buf);
-        ifc.ifc_buf = buf;
-        if (ioctl(sock, SIOCGIFCONF, &ifc) == -1)
-        {
-            // Handle error
-            close(sock);
-            return "";
-        }
-
-        struct ifreq *it = ifc.ifc_req;
-        const struct ifreq *const end = it + (ifc.ifc_len / sizeof(struct ifreq));
-
-        for (; it != end; ++it)
-        {
-            strcpy(ifr.ifr_name, it->ifr_name);
-            if (ioctl(sock, SIOCGIFFLAGS, &ifr) == 0)
-            {
-                if (!(ifr.ifr_flags & IFF_LOOPBACK))
-                { // Don't count loopback
-                    if (ioctl(sock, SIOCGIFHWADDR, &ifr) == 0)
-                    {
-                        success = 1;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                // Handle error
-                close(sock);
-                return "";
-            }
-        }
-
-        unsigned char mac_address[6];
-
-        if (success)
-        {
-            memcpy(mac_address, ifr.ifr_hwaddr.sa_data, 6);
-        }
-        else
-        {
-            close(sock);
-            return "";
-        }
-
-        close(sock);
-
-        std::ostringstream mac_stream;
-        mac_stream << std::hex << std::setfill('0');
-        for (int i = 0; i < 6; ++i)
-        {
-            mac_stream << std::setw(2) << static_cast<int>(mac_address[i]);
-            if (i != 5)
-                mac_stream << ":";
-        }
-
-        return mac_stream.str();
-    }
 };
