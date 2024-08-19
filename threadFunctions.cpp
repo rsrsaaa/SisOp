@@ -98,7 +98,7 @@ void ThreadInterface()
         }
 
         lock.unlock();                                        // Libera o mutex para outras operações
-        std::this_thread::sleep_for(std::chrono::seconds(1)); // Aguarda 1 segundo antes de atualizar a tabela novamente
+        std::this_thread::sleep_for(std::chrono::seconds(10)); // Aguarda 1 segundo antes de atualizar a tabela novamente
     }
 }
 // INTERFACE THREADS END
@@ -106,16 +106,19 @@ void ThreadInterface()
 // CLIENT THREADS BEGIN
 void ThreadStartClient()
 {
-    Client client;
-    client.InitClientSocket();
-    client.SendRequestToServer();
-    client.ListenToServer();
+    {
+        Client client;
+        client.InitClientSocket();
+        client.SendRequestToServer();
+        if(temLider)
+            client.ListenToServer();
+    }
 }
 
 void ThreadReplicationListen()
 {
     Client client;
-    while (1)
+    while (temLider)
     {
 
         client.ListenToReplication();
@@ -126,7 +129,7 @@ void ThreadClientInterface()
 {
     Server client;
     // int option = 0;
-    while (1)
+    while (temLider)
     {
         clearscreen();
         client.PrintTable();
