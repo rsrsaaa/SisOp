@@ -1,15 +1,23 @@
 // mainApp.cpp
 #include "threadFunctions.cpp"
 
-int main(int argc, char *argv[])
+int main()
 {
     mutex mlock;
 
-    if (argc > 1)
+    while(true)
     {
-        if (strcmp(argv[1], "manager") == 0)
-        {
 
+        thread threadClient(ThreadStartClient);
+        thread threadReplicationListen(ThreadReplicationListen);
+        thread clientInterface(ThreadClientInterface);
+
+        threadClient.join();
+        threadReplicationListen.join();
+        clientInterface.join();
+        
+        if(!temLider)
+        {
             thread threadInterface(ThreadInterface);
             thread threadServerDiscover(ThreadServerDiscover, ref(mlock));
             thread threadServerSleepStatus(ThreadServerSleepStatus, ref(mlock));
@@ -20,17 +28,6 @@ int main(int argc, char *argv[])
             threadServerSleepStatus.join();
             threadSendReplication.join();
         }
-    }
-    else
-    {
-
-        thread threadClient(ThreadStartClient);
-        thread threadReplicationListen(ThreadReplicationListen);
-        thread clientInterface(ThreadClientInterface);
-
-        threadClient.join();
-        threadReplicationListen.join();
-        clientInterface.join();
     }
 
     return 0;
