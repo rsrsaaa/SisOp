@@ -33,45 +33,85 @@ public:
             perror("Error binding socket");
             exit(1);
         }
-        currentIP = "xxx.xxx.xxx.xxx";
-        table[0].ip = "xxx.xxx.xxx.xxx";
-        table[0].name = "xxx.xxx.xxx.xxx";
+
+        // Obtém o IP da interface "eth0"
+        currentIP = GetIPAddress("eth0");
+        if (currentIP.empty())
+        {
+            perror("Failed to get IP address");
+            exit(1);
+        }
+
+        table[0].ip = currentIP;
+        table[0].name = currentIP;
         table[0].mac = myMAC;
         table[0].isLeader = true;
+
         return sockfd;
+    }
+    std::string GetIPAddress(const std::string &interfaceName)
+    {
+        struct ifaddrs *ifaddr, *ifa;
+        std::string ipAddress = "";
+
+        if (getifaddrs(&ifaddr) == -1)
+        {
+            perror("getifaddrs");
+            exit(EXIT_FAILURE);
+        }
+
+        // Loop pelas interfaces de rede
+        for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next)
+        {
+            if (ifa->ifa_addr == nullptr)
+                continue;
+
+            // Verifica se é a interface desejada e se o endereço é IPv4
+            if (ifa->ifa_addr->sa_family == AF_INET && interfaceName == ifa->ifa_name)
+            {
+                char host[NI_MAXHOST];
+                if (getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, nullptr, 0, NI_NUMERICHOST) == 0)
+                {
+                    ipAddress = host;
+                    break;
+                }
+            }
+        }
+
+        freeifaddrs(ifaddr);
+        return ipAddress;
     }
 
     string ListenToClientDiscover(int sockfd)
     {
-    clilen = sizeof(cli_addr);
-    unsigned int length;
-    bzero(buff, sizeof(buff));
-    length = sizeof(struct sockaddr_in);
-    n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *)&cli_addr, &length);
-    if (n < 0)
-    {
-        perror("Error reading from socket");
-        exit(1);
+        clilen = sizeof(cli_addr);
+        unsigned int length;
+        bzero(buff, sizeof(buff));
+        length = sizeof(struct sockaddr_in);
+        n = recvfrom(sockfd, buff, 256, 0, (struct sockaddr *)&cli_addr, &length);
+        if (n < 0)
+        {
+            perror("Error reading from socket");
+            exit(1);
+        }
+
+        std::string received_message(buff);
+        size_t delimiter_pos = received_message.find(';');
+        std::string mac_address = received_message.substr(delimiter_pos + 1);
+
+        // Armazena o endereço MAC em uma variável temporária
+        current_mac = mac_address;
+
+        // Enviar uma resposta ao cliente
+        const char *response = "ok";
+        n = sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&cli_addr, sizeof(cli_addr));
+        if (n < 0)
+        {
+            perror("Error sending response to client");
+        }
+
+        return received_message.substr(0, delimiter_pos); // Retorna apenas a parte da mensagem sem o MAC
     }
-
-    std::string received_message(buff);
-    size_t delimiter_pos = received_message.find(';');
-    std::string mac_address = received_message.substr(delimiter_pos + 1);
-
-    // Armazena o endereço MAC em uma variável temporária
-    current_mac = mac_address;
-
-    // Enviar uma resposta ao cliente
-    const char *response = "ok";
-    n = sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)&cli_addr, sizeof(cli_addr));
-    if (n < 0)
-    {
-        perror("Error sending response to client");
-    }
-
-    return received_message.substr(0, delimiter_pos); // Retorna apenas a parte da mensagem sem o MAC
-}
-
 
     void AddNewClientToTable()
     {
@@ -97,7 +137,7 @@ public:
     {
         for (int i = 0; i < TABLE_SIZE; i++)
         {
-            if (table[i].ip != " " && table[i].ip != currentIP)
+            if (table[i].ip != " ")
             {
                 int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
                 if (sockfd < 0)
@@ -175,7 +215,7 @@ public:
 
         for (int i = 0; i < TABLE_SIZE; i++)
         {
-            if (table[i].ip != " " && table[i].ip != currentIP)
+            if (table[i].ip != " ")
             {
                 int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
                 if (sockfd < 0)

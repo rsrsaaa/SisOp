@@ -23,6 +23,7 @@
 #include <condition_variable>
 #include <chrono>
 #include <termios.h>
+#include <ifaddrs.h>
 
 using namespace std;
 #define DISCOVER_PORT 53000
