@@ -97,7 +97,7 @@ void ThreadInterface()
             std::cout << "\rserver$: " << std::flush; // Mantém o prompt na mesma linha
         }
 
-        lock.unlock();                                        // Libera o mutex para outras operações
+        lock.unlock();                                         // Libera o mutex para outras operações
         std::this_thread::sleep_for(std::chrono::seconds(10)); // Aguarda 1 segundo antes de atualizar a tabela novamente
     }
 }
@@ -106,18 +106,17 @@ void ThreadInterface()
 // CLIENT THREADS BEGIN
 void ThreadStartClient()
 {
-    {
-        Client client;
-        client.InitClientSocket();
-        client.SendRequestToServer();
-        if(temLider)
-            client.ListenToServer();
-    }
+    Client client;
+    client.InitClientSocket();
+    client.SendRequestToServer();
+    if (temLider)
+        client.ListenToServer();
 }
 
 void ThreadReplicationListen()
 {
     Client client;
+    sleep(1);
     while (temLider)
     {
 
@@ -128,7 +127,7 @@ void ThreadReplicationListen()
 void ThreadClientInterface()
 {
     Server client;
-    // int option = 0;
+    sleep(1);
     while (temLider)
     {
         clearscreen();

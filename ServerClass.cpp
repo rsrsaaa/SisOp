@@ -197,6 +197,7 @@ public:
                     table[i].versaoTabela = versaoTabela;
 
                     cout << "rep";
+                    sleep(2);
                     n = sendto(sockfd, repTable.c_str(), strlen(repTable.c_str()), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
                     if (n < 0)
                     {
